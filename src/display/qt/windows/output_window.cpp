@@ -9,6 +9,9 @@
  *
  */
 
+#include <QNetworkAccessManager>
+#include <QNetworkRequest>
+#include <QNetworkReply>
 #include <QElapsedTimer>
 #include <QTextDocument>
 #include <QElapsedTimer>
@@ -24,10 +27,20 @@
 #include <QLabel>
 #include <cmath>
 #include "display/qt/subclasses/QOpenGLWidget_opengl_renderer.h"
-#include "display/qt/windows/control_panel_window.h"
+#include "display/qt/dialogs/output_resolution_dialog.h"
+#include "display/qt/dialogs/input_resolution_dialog.h"
+#include "display/qt/dialogs/video_and_color_dialog.h"
+#include "display/qt/dialogs/filter_graph_dialog.h"
 #include "display/qt/dialogs/resolution_dialog.h"
+#include "display/qt/dialogs/anti_tear_dialog.h"
 #include "display/qt/dialogs/overlay_dialog.h"
+#include "display/qt/dialogs/record_dialog.h"
 #include "display/qt/windows/output_window.h"
+#include "display/qt/dialogs/alias_dialog.h"
+#include "display/qt/dialogs/about_dialog.h"
+#include "display/qt/persistent_settings.h"
+#include "filter/anti_tear.h"
+#include "common/propagate.h"
 #include "capture/capture.h"
 #include "capture/alias.h"
 #include "common/globals.h"
@@ -57,78 +70,294 @@ MainWindow::MainWindow(QWidget *parent) :
 {
     ui->setupUi(this);
 
-    // Set up a layout for the central widget now, so we can add the OpenGL
+    ui->centralwidget->setMouseTracking(true);
+    ui->centralwidget->setFocusPolicy(Qt::StrongFocus);
+
+    ui->menuBar->setMouseTracking(true);
+    ui->menuBar->setFocusPolicy(Qt::StrongFocus);
+
+    // Set up a layout for the central widget, so we can add the OpenGL
     // render surface to it when OpenGL is enabled.
     QVBoxLayout *const mainLayout = new QVBoxLayout(ui->centralwidget);
     mainLayout->setMargin(0);
     mainLayout->setSpacing(0);
 
-    // Set up the control panel window.
+    ui->menuBar->setVisible(false);
+
+    // Set up the child dialogs.
     {
-        controlPanel = new ControlPanel;
-
-        connect(controlPanel, &ControlPanel::new_programwide_style_file,
-                        this, [this](const QString &filename)
-        {
-            apply_programwide_styling(filename);
-        });
-
-        connect(controlPanel, &ControlPanel::open_overlay_dialog,
-                        this, [this]
-        {
-            show_overlay_dialog();
-        });
-
-        connect(controlPanel, &ControlPanel::update_output_window_title,
-                        this, [this]
-        {
-            update_window_title();
-        });
-
-        connect(controlPanel, &ControlPanel::update_output_window_size,
-                        this, [this]
-        {
-            update_window_size();
-        });
-
-        connect(controlPanel, &ControlPanel::set_renderer,
-                        this, [this](const QString &rendererName)
-        {
-            if (rendererName == "Software")
-            {
-                INFO(("Renderer: software."));
-                set_opengl_enabled(false);
-            }
-            else if (rendererName == "OpenGL")
-            {
-                INFO(("Renderer: OpenGL."));
-                set_opengl_enabled(true);
-            }
-            else
-            {
-                k_assert(0, "Unknown renderer type.");
-            }
-        });
-
-        // Note: the relevant signals and slots should be connected, above, before
-        // asking to restore persistent settings, so that any settings that rely
-        // on emitting signals back take proper effect.
-        controlPanel->restore_persistent_settings();
-    }
-
-    // Set up the overlay dialog.
-    {
+        outputResolutionDlg = new OutputResolutionDialog;
+        inputResolutionDlg = new InputResolutionDialog;
+        filterGraphDlg = new FilterGraphDialog;
+        antitearDlg = new AntiTearDialog;
         overlayDlg = new OverlayDialog;
+        videoDlg = new VideoAndColorDialog;
+        aliasDlg = new AliasDialog;
+        aboutDlg = new AboutDialog;
+        recordDlg = new RecordDialog;
+
+        this->dialogs << outputResolutionDlg
+                      << inputResolutionDlg
+                      << filterGraphDlg
+                      << antitearDlg
+                      << overlayDlg
+                      << videoDlg
+                      << aliasDlg
+                      << aboutDlg
+                      << recordDlg;
     }
 
-    // Apply program styling.
+    // Create the window's menu bar.
     {
-        qApp->setWindowIcon(QIcon(":/res/images/icons/appicon.ico"));
+        std::vector<QMenu*> menus;
 
-        if (controlPanel && controlPanel->custom_program_styling_enabled())
+        // File...
         {
-            apply_programwide_styling(":/res/stylesheets/appstyle-gray.qss");
+            QMenu *menu = new QMenu("File", this);
+            menus.push_back(menu);
+
+            connect(menu->addAction("Exit"), &QAction::triggered, this, [=]{this->close();});
         }
+
+        // Input...
+        {
+            QMenu *menu = new QMenu("Input", this);
+            menus.push_back(menu);
+
+            QMenu *channel = new QMenu("Channel", this);
+            {
+                QActionGroup *group = new QActionGroup(this);
+
+                for (int i = 0; i < kc_hardware().meta.num_capture_inputs(); i++)
+                {
+                    QAction *inputChannel = new QAction(QString::number(i+1), this);
+                    inputChannel->setActionGroup(group);
+                    inputChannel->setCheckable(true);
+                    channel->addAction(inputChannel);
+
+                    if (i == int(INPUT_CHANNEL_IDX))
+                    {
+                        inputChannel->setChecked(true);
+                    }
+
+                    connect(inputChannel, &QAction::triggered, this, [=]{kc_set_input_channel(i);});
+                }
+            }
+
+            QMenu *colorDepth = new QMenu("Color depth", this);
+            {
+                QActionGroup *group = new QActionGroup(this);
+
+                QAction *c24 = new QAction("24-bit (888)", this);
+                c24->setActionGroup(group);
+                c24->setCheckable(true);
+                c24->setChecked(true);
+                colorDepth->addAction(c24);
+
+                QAction *c16 = new QAction("16-bit (565)", this);
+                c16->setActionGroup(group);
+                c16->setCheckable(true);
+                colorDepth->addAction(c16);
+
+                QAction *c15 = new QAction("15-bit (555)", this);
+                c15->setActionGroup(group);
+                c15->setCheckable(true);
+                colorDepth->addAction(c15);
+
+                connect(c24, &QAction::triggered, this, [=]{kc_set_input_color_depth(24);});
+                connect(c16, &QAction::triggered, this, [=]{kc_set_input_color_depth(16);});
+                connect(c15, &QAction::triggered, this, [=]{kc_set_input_color_depth(15);});
+            }
+
+            menu->addMenu(channel);
+            menu->addSeparator();
+            menu->addMenu(colorDepth);
+            menu->addSeparator();
+
+            QAction *video = new QAction("Video...", this);
+            video->setShortcut(QKeySequence("ctrl+v"));
+            menu->addAction(video);
+
+            connect(menu->addAction("Aliases..."), &QAction::triggered, this, [=]{this->open_alias_dialog();});
+
+            QAction *resolution = new QAction("Resolution...", this);
+            resolution->setShortcut(QKeySequence("ctrl+i"));
+            menu->addAction(resolution);
+
+            connect(video, &QAction::triggered, this, [=]{this->open_video_dialog();});
+            connect(resolution, &QAction::triggered, this, [=]{this->open_input_resolution_dialog();});
+        }
+
+        // Output...
+        {
+            QMenu *menu = new QMenu("Output", this);
+            menus.push_back(menu);
+
+            const std::vector<std::string> scalerNames = ks_list_of_scaling_filter_names();
+            k_assert(!scalerNames.empty(), "Expected to receive a list of scalers, but got an empty list.");
+
+            QMenu *renderer = new QMenu("Renderer", this);
+            {
+                QActionGroup *group = new QActionGroup(this);
+
+                QAction *opengl = new QAction("OpenGL", this);
+                opengl->setActionGroup(group);
+                opengl->setCheckable(true);
+                renderer->addAction(opengl);
+
+                QAction *software = new QAction("Software", this);
+                software->setActionGroup(group);
+                software->setCheckable(true);
+                renderer->addAction(software);
+
+                connect(opengl, &QAction::toggled, this, [=](const bool checked){if (checked) this->set_opengl_enabled(true);});
+                connect(software, &QAction::toggled, this, [=](const bool checked){if (checked) this->set_opengl_enabled(false);});
+
+                if (kpers_value_of(INI_GROUP_OUTPUT, "renderer", "Software").toString() == "Software")
+                {
+                    software->setChecked(true);
+                }
+                else
+                {
+                    opengl->setChecked(true);
+                }
+            }
+
+            QMenu *upscaler = new QMenu("Upscaler", this);
+            {
+                QActionGroup *group = new QActionGroup(this);
+
+                const QString defaultUpscalerName = kpers_value_of(INI_GROUP_OUTPUT, "upscaler", "Linear").toString();
+
+                for (const auto &scalerName: scalerNames)
+                {
+                    QAction *scaler = new QAction(QString::fromStdString(scalerName), this);
+                    scaler->setActionGroup(group);
+                    scaler->setCheckable(true);
+                    upscaler->addAction(scaler);
+
+                    connect(scaler, &QAction::toggled, this, [=](const bool checked){if (checked) ks_set_upscaling_filter(scalerName);});
+
+                    if (QString::fromStdString(scalerName) == defaultUpscalerName)
+                    {
+                        scaler->setChecked(true);
+                    }
+                }
+            }
+
+            QMenu *downscaler = new QMenu("Downscaler", this);
+            {
+                QActionGroup *group = new QActionGroup(this);
+
+                const QString defaultDownscalerName = kpers_value_of(INI_GROUP_OUTPUT, "downscaler", "Linear").toString();
+
+                for (const auto &scalerName: scalerNames)
+                {
+                    QAction *scaler = new QAction(QString::fromStdString(scalerName), this);
+                    scaler->setActionGroup(group);
+                    scaler->setCheckable(true);
+                    downscaler->addAction(scaler);
+
+                    connect(scaler, &QAction::toggled, this, [=](const bool checked){if (checked) ks_set_downscaling_filter(scalerName);});
+
+
+                    if (QString::fromStdString(scalerName) == defaultDownscalerName)
+                    {
+                        scaler->setChecked(true);
+                    }
+                }
+            }
+
+            QMenu *aspectRatio = new QMenu("Aspect ratio", this);
+            {
+                QActionGroup *group = new QActionGroup(this);
+
+                QAction *native = new QAction("Native", this);
+                native->setActionGroup(group);
+                native->setCheckable(true);
+                aspectRatio->addAction(native);
+
+                QAction *always43 = new QAction("Always 4:3", this);
+                always43->setActionGroup(group);
+                always43->setCheckable(true);
+                aspectRatio->addAction(always43);
+
+                QAction *traditional43 = new QAction("Traditional 4:3", this);
+                traditional43->setActionGroup(group);
+                traditional43->setCheckable(true);
+                aspectRatio->addAction(traditional43);
+
+                const QString defaultAspectRatio = kpers_value_of(INI_GROUP_OUTPUT, "aspect_mode", "Native").toString();
+
+                connect(native, &QAction::toggled, this,
+                        [=](const bool checked){if (checked) { ks_set_forced_aspect_enabled(false); ks_set_aspect_mode(aspect_mode_e::native);}});
+                connect(traditional43, &QAction::toggled, this,
+                        [=](const bool checked){if (checked) { ks_set_forced_aspect_enabled(true); ks_set_aspect_mode(aspect_mode_e::traditional_4_3);}});
+                connect(always43, &QAction::toggled, this,
+                        [=](const bool checked){if (checked) { ks_set_forced_aspect_enabled(true); ks_set_aspect_mode(aspect_mode_e::always_4_3);}});
+
+                if (defaultAspectRatio == "Native") native->setChecked(true);
+                else if (defaultAspectRatio == "Always 4:3") always43->setChecked(true);
+                else if (defaultAspectRatio == "Traditional 4:3") traditional43->setChecked(true);
+            }
+
+            menu->addMenu(renderer);
+            menu->addSeparator();
+            menu->addMenu(aspectRatio);
+            menu->addSeparator();
+            menu->addMenu(upscaler);
+            menu->addMenu(downscaler);
+            menu->addSeparator();
+
+            QAction *record = new QAction("Record...", this);
+            record->setShortcut(QKeySequence("ctrl+r"));
+            menu->addAction(record);
+            connect(record, &QAction::triggered, this, [=]{this->open_record_dialog();});
+
+            QAction *overlay = new QAction("Overlay...", this);
+            overlay->setShortcut(QKeySequence("ctrl+l"));
+            menu->addAction(overlay);
+            connect(overlay, &QAction::triggered, this, [=]{this->open_overlay_dialog();});
+
+            QAction *antiTear = new QAction("Anti-tear...", this);
+            antiTear->setShortcut(QKeySequence("ctrl+a"));
+            menu->addAction(antiTear);
+            connect(antiTear, &QAction::triggered, this, [=]{this->open_antitear_dialog();});
+
+            QAction *resolution = new QAction("Resolution...", this);
+            resolution->setShortcut(QKeySequence("ctrl+o"));
+            menu->addAction(resolution);
+            connect(resolution, &QAction::triggered, this, [=]{this->open_output_resolution_dialog();});
+
+            QAction *filter = new QAction("Filter graph...", this);
+            filter->setShortcut(QKeySequence("ctrl+f"));
+            menu->addAction(filter);
+            connect(filter, &QAction::triggered, this, [=]{this->open_filter_graph_dialog();});
+        }
+
+        // Help...
+        {
+            QMenu *menu = new QMenu("Help", this);
+            menus.push_back(menu);
+
+            connect(menu->addAction("About..."), &QAction::triggered, this, [=]{this->open_about_dialog();});
+        }
+
+        for (QMenu *const menu: menus)
+        {
+            ui->menuBar->addMenu(menu);
+            connect(menu, &QMenu::aboutToHide, this, [=]{ui->centralwidget->setFocus(); this->mouseActivityMonitor.report_activity();});
+
+            // Ensure that action shortcuts can be used regardless of which dialog
+            // has focus.
+            this->addActions(menu->actions());
+            for (auto dialog: this->dialogs)
+            {
+                dialog->addActions(menu->actions());
+            }
+        }
+
+        connect(this->menuBar(), &QMenuBar::hovered, this, [=]{this->mouseActivityMonitor.report_activity();});
     }
 
     // We intend to repaint the entire window every time we update it, so ask for no automatic fill.
@@ -136,7 +365,6 @@ MainWindow::MainWindow(QWidget *parent) :
 
     update_window_size();
     update_window_title();
-
     set_keyboard_shortcuts();
 
 #ifdef _WIN32
@@ -146,28 +374,89 @@ MainWindow::MainWindow(QWidget *parent) :
     toggle_window_border();
 #endif
 
-    // Locate the control panel in a convenient position on the screen.
-    controlPanel->move(std::min(QGuiApplication::primaryScreen()->availableSize().width() - controlPanel->width(),
-                                this->width() + (this->frameSize() - this->size()).width()), 0);
-    controlPanel->show();
-
-    this->move(0, 0);
     this->activateWindow();
     this->raise();
+
+    // Check over the network whether there are updates available for VCS.
+    {
+        QNetworkAccessManager *network = new QNetworkAccessManager(this);
+        connect(network, &QNetworkAccessManager::finished, [=](QNetworkReply *reply)
+        {
+            if (reply->error() == QNetworkReply::NoError)
+            {
+                bool isNewVersionAvailable = reply->readAll().trimmed().toInt();
+
+                if (isNewVersionAvailable)
+                {
+                    INFO(("A newer version of VCS is available."));
+
+                    if (this->aboutDlg)
+                    {
+                        this->aboutDlg->notify_of_new_program_version();
+                    }
+                }
+            }
+            else
+            {
+                /// TODO. Handle the error.
+                return;
+            }
+        });
+
+        // Make the request.
+        if (!DEV_VERSION)
+        {
+            const QString url = QString("http://www.tarpeeksihyvaesoft.com/vcs/is_newer_version_available.php?uv=%1").arg(PROGRAM_VERSION_STRING);
+            network->get(QNetworkRequest(QUrl(url)));
+        }
+    }
+
+    connect(&this->mouseActivityMonitor, &mouse_activity_monitor_c::activated, this, [=]
+    {
+        this->menuBar()->setVisible(true);
+    });
+
+    connect(&this->mouseActivityMonitor, &mouse_activity_monitor_c::inactivated, this, [=]
+    {
+        // Hide the menu bar only if the mouse cursor isnät hovering over it at the moment.
+        if (!this->menuBar()->hasFocus())
+        {
+            this->menuBar()->setVisible(false);
+        }
+    });
 
     return;
 }
 
 MainWindow::~MainWindow()
 {
+    // Save persistent settings.
+    {
+        const QString aspectMode = []()->QString
+        {
+            switch (ks_aspect_mode())
+            {
+                case aspect_mode_e::native: return "Native";
+                case aspect_mode_e::always_4_3: return "Always 4:3";
+                case aspect_mode_e::traditional_4_3: return "Traditional 4:3";
+                default: return "(Unknown)";
+            }
+        }();
+
+        kpers_set_value(INI_GROUP_OUTPUT, "aspect_mode", aspectMode);
+        kpers_set_value(INI_GROUP_OUTPUT, "renderer", (OGL_SURFACE? "OpenGL" : "Software"));
+        kpers_set_value(INI_GROUP_OUTPUT, "upscaler", QString::fromStdString(ks_upscaling_filter_name()));
+        kpers_set_value(INI_GROUP_OUTPUT, "downscaler", QString::fromStdString(ks_downscaling_filter_name()));
+    }
+
     delete ui;
     ui = nullptr;
 
-    delete controlPanel;
-    controlPanel = nullptr;
-
-    delete overlayDlg;
-    overlayDlg = nullptr;
+    for (auto dialog: this->dialogs)
+    {
+        delete dialog;
+        dialog = nullptr;
+    }
 
     return;
 }
@@ -184,36 +473,94 @@ bool MainWindow::load_font(const QString &filename)
     return true;
 }
 
-// Loads a QSS stylesheet from the given file, and assigns it to the entire
-// program. Returns true if the file was successfully opened; false otherwise;
-// will not signal whether actually assigning the stylesheet succeeded or not.
-bool MainWindow::apply_programwide_styling(const QString &filename)
+void MainWindow::open_filter_graph_dialog(void)
 {
-    // Take an empty filename to mean that all custom stylings should be removed.
-    if (filename.isEmpty())
-    {
-        qApp->setStyleSheet("");
+    k_assert(this->filterGraphDlg != nullptr, "");
+    this->filterGraphDlg->show();
+    this->filterGraphDlg->activateWindow();
+    this->filterGraphDlg->raise();
 
-        return true;
-    }
+    return;
+}
 
-    // Apply the given style, prepended by an OS-specific font style.
-    QFile styleFile(filename);
-    #if _WIN32
-        QFile defaultFontStyleFile(":/res/stylesheets/font-windows.qss");
-    #else
-        QFile defaultFontStyleFile(":/res/stylesheets/font-linux.qss");
-    #endif
-    if (styleFile.open(QIODevice::ReadOnly) &&
-        defaultFontStyleFile.open(QIODevice::ReadOnly))
-    {
-        qApp->setStyleSheet(QString("%1 %2").arg(QString(defaultFontStyleFile.readAll()))
-                                            .arg(QString(styleFile.readAll())));
+void MainWindow::open_output_resolution_dialog(void)
+{
+    k_assert(this->outputResolutionDlg != nullptr, "");
+    this->outputResolutionDlg->show();
+    this->outputResolutionDlg->activateWindow();
+    this->outputResolutionDlg->raise();
 
-        return true;
-    }
+    return;
+}
 
-    return false;
+void MainWindow::open_input_resolution_dialog(void)
+{
+    k_assert(this->inputResolutionDlg != nullptr, "");
+    this->inputResolutionDlg->show();
+    this->inputResolutionDlg->activateWindow();
+    this->inputResolutionDlg->raise();
+
+    return;
+}
+
+void MainWindow::open_video_dialog(void)
+{
+    k_assert(this->videoDlg != nullptr, "");
+    this->videoDlg->show();
+    this->videoDlg->activateWindow();
+    this->videoDlg->raise();
+
+    return;
+}
+
+void MainWindow::open_overlay_dialog(void)
+{
+    k_assert(this->overlayDlg != nullptr, "");
+    this->overlayDlg->show();
+    this->overlayDlg->activateWindow();
+    this->overlayDlg->raise();
+
+    return;
+}
+
+void MainWindow::open_record_dialog(void)
+{
+    k_assert(this->recordDlg != nullptr, "");
+    this->recordDlg->show();
+    this->recordDlg->activateWindow();
+    this->recordDlg->raise();
+
+    return;
+}
+
+void MainWindow::open_about_dialog(void)
+{
+    k_assert(this->aboutDlg != nullptr, "");
+    this->aboutDlg->show();
+    this->aboutDlg->activateWindow();
+    this->aboutDlg->raise();
+
+    return;
+}
+
+void MainWindow::open_alias_dialog(void)
+{
+    k_assert(this->aliasDlg != nullptr, "");
+    this->aliasDlg->show();
+    this->aliasDlg->activateWindow();
+    this->aliasDlg->raise();
+
+    return;
+}
+
+void MainWindow::open_antitear_dialog(void)
+{
+    k_assert(this->antitearDlg != nullptr, "");
+    this->antitearDlg->show();
+    this->antitearDlg->activateWindow();
+    this->antitearDlg->raise();
+
+    return;
 }
 
 void MainWindow::refresh(void)
@@ -231,6 +578,8 @@ void MainWindow::set_opengl_enabled(const bool enabled)
 {
     if (enabled)
     {
+        INFO(("Renderer: OpenGL."));
+
         k_assert((OGL_SURFACE == nullptr), "Can't doubly enable OpenGL.");
 
         OGL_SURFACE = new OGLWidget(std::bind(&MainWindow::overlay_image, this), this);
@@ -251,6 +600,8 @@ void MainWindow::set_opengl_enabled(const bool enabled)
     }
     else
     {
+        INFO(("Renderer: Software."));
+
         ui->centralwidget->layout()->removeWidget(OGL_SURFACE);
         delete OGL_SURFACE;
         OGL_SURFACE = nullptr;
@@ -263,19 +614,31 @@ void MainWindow::closeEvent(QCloseEvent*)
 {
     PROGRAM_EXIT_REQUESTED = 1;
 
-    k_assert(controlPanel != nullptr, "");
-    controlPanel->close();
+    return;
+}
 
-    k_assert(overlayDlg != nullptr, "");
-    overlayDlg->close();
+void MainWindow::enterEvent(QEvent *event)
+{
+    if (ui->centralwidget->hasFocus())
+    {
+        this->mouseActivityMonitor.report_activity();
+    }
+
+    (void)event;
+
+    return;
+}
+
+void MainWindow::leaveEvent(QEvent *event)
+{
+    (void)event;
 
     return;
 }
 
 void MainWindow::mouseDoubleClickEvent(QMouseEvent *event)
 {
-    // Toggle the window border on/off.
-    if (event->button() == Qt::LeftButton )
+    if (event->button() == Qt::LeftButton)
     {
         toggle_window_border();
     }
@@ -303,6 +666,11 @@ void MainWindow::changeEvent(QEvent *event)
 static QPoint PREV_MOUSE_POS; /// Temp. Used to track mouse movement delta across frames.
 void MainWindow::mouseMoveEvent(QMouseEvent *event)
 {
+    if (ui->centralwidget->hasFocus())
+    {
+        this->mouseActivityMonitor.report_activity();
+    }
+
     // If the cursor is over the capture window and the left mouse button is being
     // held down, drag the window.
     if (QApplication::mouseButtons() & Qt::LeftButton)
@@ -318,6 +686,10 @@ void MainWindow::mouseMoveEvent(QMouseEvent *event)
 
 void MainWindow::mousePressEvent(QMouseEvent *event)
 {
+    this->mouseActivityMonitor.report_activity();
+
+    ui->centralwidget->setFocus();
+
     if (event->button() == Qt::LeftButton)
     {
         PREV_MOUSE_POS = event->globalPos();
@@ -328,10 +700,12 @@ void MainWindow::mousePressEvent(QMouseEvent *event)
 
 void MainWindow::mouseReleaseEvent(QMouseEvent *event)
 {
+    this->mouseActivityMonitor.report_activity();
+
     if (event->button() == Qt::MidButton)
     {
         // If the capture window is pressed with the middle mouse button, show the overlay dialog.
-        show_overlay_dialog();
+        open_overlay_dialog();
     }
 
     return;
@@ -339,15 +713,24 @@ void MainWindow::mouseReleaseEvent(QMouseEvent *event)
 
 void MainWindow::wheelEvent(QWheelEvent *event)
 {
-    if ((controlPanel != nullptr) &&
-        controlPanel->is_mouse_wheel_scaling_allowed())
+    if ((this->outputResolutionDlg != nullptr) &&
+        this->is_mouse_wheel_scaling_allowed())
     {
         // Adjust the size of the capture window with the mouse scroll wheel.
         const int dir = (event->angleDelta().y() < 0)? 1 : -1;
-        controlPanel->adjust_output_scaling(dir);
+        this->outputResolutionDlg->adjust_output_scaling(dir);
     }
 
     return;
+}
+
+// Returns true if the user is allowed to scale the output resolution by using the
+// mouse wheel over the capture window.
+//
+bool MainWindow::is_mouse_wheel_scaling_allowed(void)
+{
+    return (!kd_is_fullscreen() && // On my virtual machine, at least, wheel scaling while in full-screen messes up the full-screen mode.
+            !krecord_is_recording());
 }
 
 // Returns the current overlay as a QImage, or a null QImage if the overlay
@@ -357,7 +740,7 @@ QImage MainWindow::overlay_image(void)
 {
     if (!kc_no_signal() &&
         overlayDlg != nullptr &&
-        controlPanel->is_overlay_enabled())
+        overlayDlg->is_overlay_enabled())
     {
         return overlayDlg->overlay_as_qimage();
     }
@@ -468,7 +851,7 @@ void MainWindow::paintEvent(QPaintEvent *)
 void MainWindow::measure_framerate()
 {
     static qint64 elapsed = 0, prevElapsed = 0;
-    static u32 peakProcessTime = 0, avgProcessTime;
+    static u32 peakProcessTime = 0, avgProcessTime = 0;
     static u32 numFramesDrawn = 0;
 
     static QElapsedTimer fpsTimer;
@@ -493,10 +876,10 @@ void MainWindow::measure_framerate()
     {
         const int fps = round(1000 / (real(elapsed) / numFramesDrawn));
 
-        UPDATE_LATENCY_AVG = avgProcessTime / numFramesDrawn;
+        UPDATE_LATENCY_AVG = (avgProcessTime / numFramesDrawn);
         UPDATE_LATENCY_PEAK = peakProcessTime;
 
-        this->update_output_framerate(fps, kc_are_frames_being_missed());
+        this->update_output_framerate(fps, kc_are_frames_being_dropped());
         kc_reset_missed_frames_count();
 
         numFramesDrawn = 0;
@@ -513,7 +896,7 @@ void MainWindow::measure_framerate()
     return;
 }
 
-void MainWindow::set_keyboard_shortcuts()
+void MainWindow::set_keyboard_shortcuts(void)
 {
     // Creates a new QShortcut instance assigned to the given QKeySequence-
     // compatible sequence string (e.g. "F1" for the F1 key).
@@ -526,10 +909,11 @@ void MainWindow::set_keyboard_shortcuts()
     };
 
     // Assign ctrl + numeral key 1-9 to the input resolution force buttons.
+    k_assert(this->inputResolutionDlg != nullptr, "");
     for (uint i = 1; i <= 9; i++)
     {
         connect(keyboardShortcut(QString("ctrl+%1").arg(QString::number(i)).toStdString()),
-                &QShortcut::activated, [=]{this->controlPanel->activate_capture_res_button(i);});
+                &QShortcut::activated, [=]{this->inputResolutionDlg->activate_capture_res_button(i);});
     }
 
     // Assign alt + arrow keys to move the capture input alignment horizontally and vertically.
@@ -551,26 +935,35 @@ void MainWindow::set_keyboard_shortcuts()
 
     connect(keyboardShortcut("f5"), &QShortcut::activated, []{if (!kc_no_signal()) ALIGN_CAPTURE = true;});
 
-    connect(keyboardShortcut("ctrl+v"), &QShortcut::activated, [this]{this->controlPanel->open_video_adjust_dialog();});
-    connect(keyboardShortcut("ctrl+a"), &QShortcut::activated, [this]{this->controlPanel->open_antitear_dialog();});
-    connect(keyboardShortcut("ctrl+f"), &QShortcut::activated, [this]{this->controlPanel->open_filter_graph_dialog();});
-    connect(keyboardShortcut("ctrl+o"), &QShortcut::activated, [this]{this->controlPanel->toggle_overlay();});
+    // Make Ctrl + Shift + <x> toggle the various dialogs' functionality on/off.
+    connect(keyboardShortcut("ctrl+shift+f"), &QShortcut::activated, [=]{this->filterGraphDlg->toggle_filtering();});
+    connect(keyboardShortcut("ctrl+shift+l"), &QShortcut::activated, [=]{this->overlayDlg->toggle_overlay();});
+    connect(keyboardShortcut("ctrl+shift+a"), &QShortcut::activated, [=]{this->antitearDlg->toggle_anti_tear();});
+    connect(keyboardShortcut("ctrl+shift+r"), &QShortcut::activated, [=]{this->recordDlg->toggle_recording();});
 
     return;
 }
 
 void MainWindow::signal_new_known_alias(const mode_alias_s a)
 {
-    k_assert(controlPanel != nullptr, "");
-    controlPanel->notify_of_new_alias(a);
+    k_assert(this->aliasDlg != nullptr, "");
+    aliasDlg->receive_new_alias(a);
 
     return;
 }
 
 void MainWindow::clear_filter_graph(void)
 {
-    k_assert(controlPanel != nullptr, "");
-    controlPanel->clear_filter_graph();
+    k_assert(this->filterGraphDlg != nullptr, "");
+    filterGraphDlg->clear_filter_graph();
+
+    return;
+}
+
+void MainWindow::disable_output_size_controls(const bool areDisabled)
+{
+    k_assert(this->outputResolutionDlg != nullptr, "");
+    outputResolutionDlg->disable_output_size_controls(areDisabled);
 
     return;
 }
@@ -578,63 +971,65 @@ void MainWindow::clear_filter_graph(void)
 FilterGraphNode* MainWindow::add_filter_graph_node(const filter_type_enum_e &filterType,
                                                    const u8 *const initialParameterValues)
 {
-    k_assert(controlPanel != nullptr, "");
-    return controlPanel->add_filter_graph_node(filterType, initialParameterValues);
+    k_assert(this->filterGraphDlg != nullptr, "");
+    return this->filterGraphDlg->add_filter_graph_node(filterType, initialParameterValues);
 }
 
 void MainWindow::signal_new_mode_settings_source_file(const std::string &filename)
 {
-    k_assert(controlPanel != nullptr, "");
-    controlPanel->notify_of_new_mode_settings_source_file(QString::fromStdString(filename));
+    k_assert(this->videoDlg != nullptr, "");
+    this->videoDlg->receive_new_mode_settings_filename(QString::fromStdString(filename));
 
     return;
 }
 
-// Updates the window title with the capture's current status.
+void MainWindow::set_recording_is_active(const bool isActive)
+{
+    k_assert(this->recordDlg != nullptr, "");
+    this->recordDlg->set_recording_controls_enabled(isActive);
+
+    return;
+}
+
+// Updates the window title with the current status of capture and that of the program
+// in general.
 //
 void MainWindow::update_window_title()
 {
-    QString scaleString, latencyString, inResString, recordingString;
+    QString title = PROGRAM_NAME;
 
     if (kc_no_signal())
     {
-        latencyString = " - No signal";
+        title = QString("%1 - No signal").arg(PROGRAM_NAME);
     }
     else if (kc_is_invalid_signal())
     {
-        latencyString = " - Invalid signal";
+        title = QString("%1 - Invalid signal").arg(PROGRAM_NAME);
     }
     else
     {
         const resolution_s inRes = kc_hardware().status.capture_resolution();
         const resolution_s outRes = ks_output_resolution();
-        const int size = round((outRes.h / (real)inRes.h) * 100);
+        const int relativeScale = round((outRes.h / (real)inRes.h) * 100);
 
-        // Estimate the % by which the input image is scaled up/down.
-        if ((inRes.w == outRes.w) &&
-            (inRes.h == outRes.h))
-        {
-            scaleString = QString(" scaled to %1%").arg(size);
-        }
-        else
-        {
-            scaleString = QString(" scaled to ~%1%").arg(size);
-        }
+        QStringList programStatus;
+        if (krecord_is_recording()) programStatus << "R";
+        if (kf_is_filtering_enabled()) programStatus << "F";
+        if (overlayDlg->is_overlay_enabled()) programStatus << "O";
+        if (kat_is_anti_tear_enabled()) programStatus << "A";
 
-        if (kc_are_frames_being_missed())
-        {
-            latencyString = " (dropping frames)";
-        }
-
-        if (krecord_is_recording())
-        {
-            recordingString = "[rec] ";
-        }
-
-        inResString = " - " + QString("%1 x %2").arg(inRes.w).arg(inRes.h);
+        title = QString("%1%2 - %3%4 x %5 scaled to %6 x %7 (~%8%)")
+                .arg(kc_are_frames_being_dropped()? "{!} " : "")
+                .arg(PROGRAM_NAME)
+                .arg(programStatus.count()? QString("%1 - ").arg(programStatus.join("")) : "")
+                .arg(inRes.w)
+                .arg(inRes.h)
+                .arg(outRes.w)
+                .arg(outRes.h)
+                .arg(relativeScale);
     }
 
-    this->setWindowTitle(recordingString + QString(PROGRAM_NAME) + inResString + scaleString + latencyString);
+    this->setWindowTitle(title);
 
     return;
 }
@@ -643,16 +1038,16 @@ void MainWindow::set_capture_info_as_no_signal()
 {
     update_window_title();
 
-    k_assert(controlPanel != nullptr, "");
-    controlPanel->set_capture_info_as_no_signal();
+    k_assert(this->videoDlg != nullptr, "");
+    this->videoDlg->set_controls_enabled(false);
 
     return;
 }
 
 void MainWindow::set_capture_info_as_receiving_signal()
 {
-    k_assert(controlPanel != nullptr, "");
-    controlPanel->set_capture_info_as_receiving_signal();
+    k_assert(this->videoDlg != nullptr, "");
+    this->videoDlg->set_controls_enabled(true);
 
     return;
 }
@@ -667,50 +1062,63 @@ void MainWindow::update_output_framerate(const u32 fps,
 {
     CURRENT_OUTPUT_FRAMERATE = fps;
 
-    update_window_title();
+    // We assume that the window title contains information about
+    // the current frame rate, so we'll want to keep it up-to-date.
+    this->update_window_title();
 
-    k_assert(controlPanel != nullptr, "");
-    controlPanel->update_output_framerate(fps, missedFrames);
+    (void)missedFrames;
 
     return;
 }
 
 void MainWindow::update_video_mode_params(void)
 {
-    k_assert(controlPanel != nullptr, "");
-    controlPanel->update_video_mode_params();
+    k_assert(this->videoDlg != nullptr, "");
+    this->videoDlg->update_controls();
 
     return;
 }
 
 void MainWindow::update_capture_signal_info(void)
 {
-    k_assert(controlPanel != nullptr, "");
-    controlPanel->update_capture_signal_info();
+    if (kc_no_signal())
+    {
+        DEBUG(("Was asked to update GUI input info while there was no signal."));
+    }
+    else
+    {
+        k_assert(this->videoDlg != nullptr, "");
+        this->videoDlg->notify_of_new_capture_signal();
+
+        k_assert(this->outputResolutionDlg != nullptr, "");
+        this->outputResolutionDlg->notify_of_new_capture_signal();
+
+        this->update_window_title();
+    }
 
     return;
 }
 
 void MainWindow::set_filter_graph_options(const std::vector<filter_graph_option_s> &graphOptions)
 {
-    k_assert(controlPanel != nullptr, "");
-    controlPanel->set_filter_graph_options(graphOptions);
+    k_assert(this->filterGraphDlg != nullptr, "");
+    this->filterGraphDlg->set_filter_graph_options(graphOptions);
 
     return;
 }
 
 void MainWindow::set_filter_graph_source_filename(const std::string &sourceFilename)
 {
-    k_assert(controlPanel != nullptr, "");
-    controlPanel->set_filter_graph_source_filename(sourceFilename);
+    k_assert(this->filterGraphDlg != nullptr, "");
+    this->filterGraphDlg->set_filter_graph_source_filename(sourceFilename);
 
     return;
 }
 
 void MainWindow::update_recording_metainfo(void)
 {
-    k_assert(controlPanel != nullptr, "");
-    controlPanel->update_recording_metainfo();
+    k_assert(this->recordDlg != nullptr, "");
+    this->recordDlg->update_recording_metainfo();
 
     return;
 }
@@ -726,18 +1134,8 @@ void MainWindow::update_gui_state()
 
 void MainWindow::clear_known_aliases()
 {
-    k_assert(controlPanel != nullptr, "");
-    controlPanel->clear_known_aliases();
-
-    return;
-}
-
-void MainWindow::show_overlay_dialog()
-{
-    k_assert(overlayDlg != nullptr, "");
-    overlayDlg->show();
-    overlayDlg->activateWindow();
-    overlayDlg->raise();
+    k_assert(this->aliasDlg != nullptr, "");
+    this->aliasDlg->clear_known_aliases();
 
     return;
 }
@@ -750,9 +1148,6 @@ void MainWindow::update_window_size()
     overlayDlg->set_overlay_max_width(r.w);
 
     update_window_title();
-
-    k_assert(controlPanel != nullptr, "");
-    controlPanel->update_output_resolution_info();
 
     return;
 }
@@ -836,8 +1231,9 @@ void MainWindow::ShowMessageBox_Error(const QString msg)
 
 void MainWindow::add_gui_log_entry(const log_entry_s e)
 {
-    k_assert(controlPanel != nullptr, "");
-    controlPanel->add_gui_log_entry(e);
+    /// GUI logging is currently not implemented.
+
+    (void)e;
 
     return;
 }

@@ -8,32 +8,38 @@
 
 #include <QFileDialog>
 #include <QFileInfo>
-#include "display/qt/widgets/control_panel_record_widget.h"
+#include "display/qt/dialogs/record_dialog.h"
 #include "display/qt/persistent_settings.h"
 #include "display/qt/utility.h"
 #include "scaler/scaler.h"
 #include "record/record.h"
-#include "ui_control_panel_record_widget.h"
+#include "ui_record_dialog.h"
 
 #if _WIN32
     // For accessing the Windows registry.
     #include <windows.h>
 #endif
 
-ControlPanelRecordWidget::ControlPanelRecordWidget(QWidget *parent) :
-    QWidget(parent),
-    ui(new Ui::ControlPanelRecordWidget)
+RecordDialog::RecordDialog(QDialog *parent) :
+    QDialog(parent),
+    ui(new Ui::RecordDialog)
 {
     ui->setupUi(this);
 
-    // Disable certain recording features depending on the OS.
+    this->setWindowTitle("VCS - Record");
+
+    // Don't show the context help '?' button in the window bar.
+    this->setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
+
+    // Certain features of recording are not available on certain operating systems;
+    // so disable them accordingly.
     {
         // Encoder settings.
         #if _WIN32
             /// At the moment, no changes are needed on Windows.
         #elif __linux__
-            // The x264 settings are hardcoded into OpenCV's libraries
-            // on Linux, so they can't be altered via the VCS GUI.
+            // The x264 settings are hardcoded into OpenCV's libraries on Linux, so
+            // they can't be altered via the VCS GUI.
             ui->frame_recordingCodecSettings->setEnabled(false);
         #else
             #error "Unknown platform."
@@ -43,6 +49,7 @@ ControlPanelRecordWidget::ControlPanelRecordWidget(QWidget *parent) :
         {
             QString containerName;
             #if _WIN32
+                // We'll use the x264vfw encoder on Windows, which outputs into AVI.
                 containerName = "AVI";
             #elif __linux__
                 containerName = "MP4";
@@ -81,30 +88,15 @@ ControlPanelRecordWidget::ControlPanelRecordWidget(QWidget *parent) :
 
             const resolution_s videoResolution = ks_output_resolution();
 
-            if (krecord_start_recording(ui->lineEdit_recordingFilename->text().toStdString().c_str(),
+            krecord_start_recording(ui->lineEdit_recordingFilename->text().toStdString().c_str(),
                                         videoResolution.w, videoResolution.h,
                                         ui->spinBox_recordingFramerate->value(),
-                                        ui->checkBox_recordingLinearFrameInsertion->isChecked()))
-            {
-                ui->pushButton_recordingStart->setEnabled(false);
-                ui->pushButton_recordingStop->setEnabled(true);
-                ui->frame_recordingSettings->setEnabled(false);
-                ui->frame_recordingFile->setEnabled(false);
-
-                emit recording_started();
-            }
+                                        ui->checkBox_recordingLinearFrameInsertion->isChecked());
         });
 
         connect(ui->pushButton_recordingStop, &QPushButton::clicked, this, [this]
         {
             krecord_stop_recording();
-
-            ui->pushButton_recordingStart->setEnabled(true);
-            ui->pushButton_recordingStop->setEnabled(false);
-            ui->frame_recordingSettings->setEnabled(true);
-            ui->frame_recordingFile->setEnabled(true);
-
-            emit recording_stopped();
         });
 
         connect(ui->pushButton_recordingSelectFilename, &QPushButton::clicked, this, [this]
@@ -119,15 +111,38 @@ ControlPanelRecordWidget::ControlPanelRecordWidget(QWidget *parent) :
         });
     }
 
+    // Restore persistent settings.
+    {
+        ui->spinBox_recordingFramerate->setValue(kpers_value_of(INI_GROUP_RECORDING, "frame_rate", 60).toUInt());
+        ui->checkBox_recordingLinearFrameInsertion->setChecked(kpers_value_of(INI_GROUP_RECORDING, "linear_sampling", true).toBool());
+        this->resize(kpers_value_of(INI_GROUP_GEOMETRY, "record", this->size()).toSize());
+
+        #if _WIN32
+            set_qcombobox_idx_c(ui->comboBox_recordingEncoderProfile)
+                               .by_string(kpers_value_of(INI_GROUP_RECORDING, "profile", "High 4:4:4").toString());
+
+            set_qcombobox_idx_c(ui->comboBox_recordingEncoderPixelFormat)
+                               .by_string(kpers_value_of(INI_GROUP_RECORDING, "pixel_format", "RGB").toString());
+
+            set_qcombobox_idx_c(ui->comboBox_recordingEncoderPreset)
+                               .by_string(kpers_value_of(INI_GROUP_RECORDING, "preset", "Superfast").toString());
+
+            ui->spinBox_recordingEncoderCRF->setValue(kpers_value_of(INI_GROUP_RECORDING, "crf", 1).toUInt());
+            ui->checkBox_recordingEncoderZeroLatency->setChecked(kpers_value_of(INI_GROUP_RECORDING, "zero_latency", false).toBool());
+            ui->lineEdit_recordingEncoderArguments->setText(kpers_value_of(INI_GROUP_RECORDING, "command_line", "").toString());
+        #endif
+    }
+
     return;
 }
 
-ControlPanelRecordWidget::~ControlPanelRecordWidget()
+RecordDialog::~RecordDialog()
 {
     // Save persistent settings.
     {
         kpers_set_value(INI_GROUP_RECORDING, "frame_rate", ui->spinBox_recordingFramerate->value());
         kpers_set_value(INI_GROUP_RECORDING, "linear_sampling", ui->checkBox_recordingLinearFrameInsertion->isChecked());
+        kpers_set_value(INI_GROUP_GEOMETRY, "record", this->size());
 
         #if _WIN32
             // Encoder settings. These aren't available to the user on Linux (non-Windows) builds.
@@ -145,30 +160,32 @@ ControlPanelRecordWidget::~ControlPanelRecordWidget()
     return;
 }
 
-void ControlPanelRecordWidget::restore_persistent_settings(void)
+// Enables or disables the dialog's GUI controls for changing recording settings,
+// starting/stopping the recording, etc. Note that when the controls are set to
+// disabled, the 'stop recording' button will be enabled - it's assumed that one
+// calls this function to disable the controls as a result of recording having
+// begun.
+void RecordDialog::set_recording_controls_enabled(const bool areEnabled)
 {
-    ui->spinBox_recordingFramerate->setValue(kpers_value_of(INI_GROUP_RECORDING, "frame_rate", 60).toUInt());
-    ui->checkBox_recordingLinearFrameInsertion->setChecked(kpers_value_of(INI_GROUP_RECORDING, "linear_sampling", true).toBool());
-
-    #if _WIN32
-        set_qcombobox_idx_c(ui->comboBox_recordingEncoderProfile)
-                           .by_string(kpers_value_of(INI_GROUP_RECORDING, "profile", "High 4:4:4").toString());
-
-        set_qcombobox_idx_c(ui->comboBox_recordingEncoderPixelFormat)
-                           .by_string(kpers_value_of(INI_GROUP_RECORDING, "pixel_format", "RGB").toString());
-
-        set_qcombobox_idx_c(ui->comboBox_recordingEncoderPreset)
-                           .by_string(kpers_value_of(INI_GROUP_RECORDING, "preset", "Superfast").toString());
-
-        ui->spinBox_recordingEncoderCRF->setValue(kpers_value_of(INI_GROUP_RECORDING, "crf", 1).toUInt());
-        ui->checkBox_recordingEncoderZeroLatency->setChecked(kpers_value_of(INI_GROUP_RECORDING, "zero_latency", false).toBool());
-        ui->lineEdit_recordingEncoderArguments->setText(kpers_value_of(INI_GROUP_RECORDING, "command_line", "").toString());
-    #endif
+    if (areEnabled)
+    {
+        ui->pushButton_recordingStart->setEnabled(false);
+        ui->pushButton_recordingStop->setEnabled(true);
+        ui->frame_recordingSettings->setEnabled(false);
+        ui->frame_recordingFile->setEnabled(false);
+    }
+    else
+    {
+        ui->pushButton_recordingStart->setEnabled(true);
+        ui->pushButton_recordingStop->setEnabled(false);
+        ui->frame_recordingSettings->setEnabled(true);
+        ui->frame_recordingFile->setEnabled(true);
+    }
 
     return;
 }
 
-void ControlPanelRecordWidget::update_recording_metainfo(void)
+void RecordDialog::update_recording_metainfo(void)
 {
     if (krecord_is_recording())
     {
@@ -242,7 +259,7 @@ void ControlPanelRecordWidget::update_recording_metainfo(void)
 // where the codec can pick them up when it starts. On Linux, no settings need be
 // written.
 //
-bool ControlPanelRecordWidget::apply_x264_registry_settings(void)
+bool RecordDialog::apply_x264_registry_settings(void)
 {
 #if _WIN32
     const auto open_x264_registry = []()->HKEY
@@ -331,4 +348,18 @@ bool ControlPanelRecordWidget::apply_x264_registry_settings(void)
 #endif
 
     return true;
+}
+
+void RecordDialog::toggle_recording(void)
+{
+    if (krecord_is_recording())
+    {
+        ui->pushButton_recordingStop->click();
+    }
+    else
+    {
+        ui->pushButton_recordingStart->click();
+    }
+
+    return;
 }

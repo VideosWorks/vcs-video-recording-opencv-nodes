@@ -21,10 +21,15 @@ AntiTearDialog::AntiTearDialog(QWidget *parent) :
 {
     ui->setupUi(this);
 
-    this->setWindowTitle("VCS - Anti-Tearing");
+    this->setWindowTitle("VCS - Anti-tear");
 
     // Don't show the context help '?' button in the window bar.
     this->setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
+
+    // Initialize the GUI controls to their default values.
+    {
+        ui->groupBox_antiTearingEnabled->setChecked(false);
+    }
 
     // Connect the GUI controls to consequences for changing their values.
     {
@@ -51,9 +56,12 @@ AntiTearDialog::AntiTearDialog(QWidget *parent) :
         connect(ui->spinBox_stepSize, OVERLOAD_INT(&QSpinBox::valueChanged), this,
                 [this]{ kat_set_step_size(ui->spinBox_stepSize->value()); });
 
+        connect(ui->groupBox_antiTearingEnabled, &QGroupBox::toggled, this,
+                [this](const bool isEnabled){ kat_set_anti_tear_enabled(isEnabled); kd_update_output_window_title(); });
+
         #undef OVERLOAD_INT
 
-        auto restore_default_settings = [this]
+        const auto restore_default_settings = [this]
         {
             const anti_tear_options_s defaults = kat_default_settings();
 
@@ -70,7 +78,7 @@ AntiTearDialog::AntiTearDialog(QWidget *parent) :
         connect(ui->pushButton_resetDefaults, &QPushButton::clicked, this,
                 [=]{ restore_default_settings(); });
 
-        auto update_visualization_options = [this]
+        const auto update_visualization_options = [this]
         {
             kat_set_visualization(ui->groupBox_visualization->isChecked(),
                                   ui->checkBox_visualizeTear->isChecked(),
@@ -98,7 +106,7 @@ AntiTearDialog::AntiTearDialog(QWidget *parent) :
         ui->spinBox_threshold->setValue(kpers_value_of(INI_GROUP_ANTI_TEAR, "threshold", defaults.threshold).toInt());
         ui->spinBox_matchesReqd->setValue(kpers_value_of(INI_GROUP_ANTI_TEAR, "matches_reqd", defaults.matchesReqd).toInt());
         ui->spinBox_domainSize->setValue(kpers_value_of(INI_GROUP_ANTI_TEAR, "window_len", defaults.windowLen).toInt());
-
+        ui->groupBox_antiTearingEnabled->setChecked(kpers_value_of(INI_GROUP_ANTI_TEAR, "enabled", kat_is_anti_tear_enabled()).toBool());
         this->resize(kpers_value_of(INI_GROUP_GEOMETRY, "anti_tear", this->size()).toSize());
     }
 
@@ -116,9 +124,23 @@ AntiTearDialog::~AntiTearDialog()
         kpers_set_value(INI_GROUP_ANTI_TEAR, "window_len", ui->spinBox_domainSize->value());
         kpers_set_value(INI_GROUP_ANTI_TEAR, "matches_reqd", ui->spinBox_matchesReqd->value());
         kpers_set_value(INI_GROUP_ANTI_TEAR, "direction", 0);
+        kpers_set_value(INI_GROUP_ANTI_TEAR, "enabled", ui->groupBox_antiTearingEnabled->isChecked());
     }
 
     delete ui;
+
+    return;
+}
+
+bool AntiTearDialog::is_anti_tear_enabled(void)
+{
+    return bool(ui->groupBox_antiTearingEnabled->isChecked());
+}
+
+
+void AntiTearDialog::toggle_anti_tear(void)
+{
+    ui->groupBox_antiTearingEnabled->setChecked(!ui->groupBox_antiTearingEnabled->isChecked());
 
     return;
 }

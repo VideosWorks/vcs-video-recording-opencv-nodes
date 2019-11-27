@@ -21,7 +21,7 @@
 // All local RGBEASY API callbacks lock this for their duration.
 std::mutex INPUT_OUTPUT_MUTEX;
 
-// Set to true when receiving the first frame after 'no signal'.
+// Set to true upon first receiving a signal after 'no signal'.
 static bool SIGNAL_WOKE_UP = false;
 
 // If set to true, the scaler should skip the next frame we send.
@@ -292,7 +292,7 @@ void update_known_video_mode_params(const resolution_s r,
 // Returns true if the capture hardware has been offering frames while the previous
 // frame was still being processed for display.
 //
-bool kc_are_frames_being_missed(void)
+bool kc_are_frames_being_dropped(void)
 {
     return bool(CNT_FRAMES_SKIPPED > 0);
 }
@@ -605,7 +605,7 @@ capture_event_e kc_latest_capture_event(void)
         return capture_event_e::new_frame;
     }
 
-    // If there were no events.
+    // If there were no events that we should notify the caller about.
     return capture_event_e::none;
 }
 
@@ -1058,9 +1058,13 @@ resolution_s capture_hardware_s::metainfo_s::maximum_capture_resolution() const
 
 int capture_hardware_s::metainfo_s::num_capture_inputs() const
 {
+#if USE_RGBEASY_API
     unsigned long numInputs = 0;
     if (!apicall_succeeds(RGBGetNumberOfInputs(&numInputs))) return -1;
     return numInputs;
+#else
+    return 2;
+#endif
 }
 
 bool capture_hardware_s::metainfo_s::is_dma_enabled() const

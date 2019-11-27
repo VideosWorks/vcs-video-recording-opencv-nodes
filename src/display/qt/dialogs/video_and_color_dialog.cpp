@@ -37,7 +37,7 @@ VideoAndColorDialog::VideoAndColorDialog(QWidget *parent) :
 {
     ui->setupUi(this);
 
-    this->setWindowTitle("VCS - Video & Color Adjust");
+    this->setWindowTitle("VCS - Video & Color");
 
     // Don't show the context help '?' button in the window bar.
     this->setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
@@ -147,7 +147,7 @@ VideoAndColorDialog::VideoAndColorDialog(QWidget *parent) :
 
     // Restore persistent settings.
     {
-        this->resize(kpers_value_of(INI_GROUP_GEOMETRY, "video_and_color", size()).toSize());
+        this->resize(kpers_value_of(INI_GROUP_GEOMETRY, "video_and_color", this->size()).toSize());
     }
 
     return;
@@ -157,7 +157,7 @@ VideoAndColorDialog::~VideoAndColorDialog()
 {
     // Save persistent settings.
     {
-        kpers_set_value(INI_GROUP_GEOMETRY, "video_and_color", size());
+        kpers_set_value(INI_GROUP_GEOMETRY, "video_and_color", this->size());
     }
 
     delete ui;
@@ -170,6 +170,7 @@ VideoAndColorDialog::~VideoAndColorDialog()
 void VideoAndColorDialog::notify_of_new_capture_signal(void)
 {
     update_controls();
+    update_mode_label(true);
 
     return;
 }
@@ -312,6 +313,27 @@ void VideoAndColorDialog::set_controls_enabled(const bool state)
     ui->groupBox_colorAdjust->setEnabled(state);
     ui->groupBox_videoAdjust->setEnabled(state);
     ui->groupBox_meta->setEnabled(state);
+
+    update_mode_label(state);
+
+    return;
+}
+
+void VideoAndColorDialog::update_mode_label(const bool isEnabled)
+{
+    if (isEnabled)
+    {
+        const auto signal = kc_hardware().status.signal();
+        const QString labelStr = QString("%1 x %2 @ %3 Hz").arg(signal.r.w)
+                                                           .arg(signal.r.h)
+                                                           .arg(signal.refreshRate);
+
+        ui->label_currentInputMode->setText(labelStr);
+    }
+    else
+    {
+        ui->label_currentInputMode->setText("n/a");
+    }
 
     return;
 }

@@ -41,7 +41,7 @@ win32 {
     RC_ICONS = "src/display/qt/images/icons/appicon.ico"
 }
 
-QT += core gui
+QT += core gui network
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 TARGET = vcs
@@ -56,13 +56,13 @@ UI_DIR = generated_files
 INCLUDEPATH += $$PWD/src/ \
                $$PWD/src/display/qt/subclasses/
 
-RESOURCES += src/display/qt/res.qrc
+RESOURCES += \
+    src/display/qt/res.qrc
 
 SOURCES += \
     src/display/qt/windows/output_window.cpp \
     src/display/qt/dialogs/resolution_dialog.cpp \
     src/display/qt/d_main.cpp \
-    src/display/qt/windows/control_panel_window.cpp \
     src/display/qt/dialogs/video_and_color_dialog.cpp \
     src/display/qt/dialogs/overlay_dialog.cpp \
     src/display/qt/dialogs/alias_dialog.cpp \
@@ -80,10 +80,6 @@ SOURCES += \
     src/common/propagate.cpp \
     src/common/disk.cpp \
     src/capture/alias.cpp \
-    src/display/qt/widgets/control_panel_about_widget.cpp \
-    src/display/qt/widgets/control_panel_record_widget.cpp \
-    src/display/qt/widgets/control_panel_output_widget.cpp \
-    src/display/qt/widgets/control_panel_input_widget.cpp \
     src/display/qt/subclasses/QOpenGLWidget_opengl_renderer.cpp \
     src/display/qt/widgets/filter_widgets.cpp \
     src/display/qt/subclasses/QGraphicsItem_interactible_node_graph_node.cpp \
@@ -91,7 +87,11 @@ SOURCES += \
     src/display/qt/subclasses/QGraphicsView_interactible_node_graph_view.cpp \
     src/common/disk_legacy.cpp \
     src/display/qt/dialogs/filter_graph_dialog.cpp \
-    src/display/qt/subclasses/InteractibleNodeGraphNode_filter_graph_nodes.cpp
+    src/display/qt/subclasses/InteractibleNodeGraphNode_filter_graph_nodes.cpp \
+    src/display/qt/dialogs/about_dialog.cpp \
+    src/display/qt/dialogs/record_dialog.cpp \
+    src/display/qt/dialogs/output_resolution_dialog.cpp \
+    src/display/qt/dialogs/input_resolution_dialog.cpp
 
 HEADERS += \
     src/common/globals.h \
@@ -102,7 +102,6 @@ HEADERS += \
     src/scaler/scaler.h \
     src/capture/capture.h \
     src/display/display.h \
-    src/display/qt/windows/control_panel_window.h \
     src/common/log.h \
     src/display/qt/dialogs/video_and_color_dialog.h \
     src/display/qt/dialogs/overlay_dialog.h \
@@ -120,10 +119,6 @@ HEADERS += \
     src/common/propagate.h \
     src/common/disk.h \
     src/capture/alias.h \
-    src/display/qt/widgets/control_panel_about_widget.h \
-    src/display/qt/widgets/control_panel_record_widget.h \
-    src/display/qt/widgets/control_panel_output_widget.h \
-    src/display/qt/widgets/control_panel_input_widget.h \
     src/display/qt/subclasses/QOpenGLWidget_opengl_renderer.h \
     src/display/qt/widgets/filter_widgets.h \
     src/display/qt/subclasses/QGraphicsItem_interactible_node_graph_node.h \
@@ -133,21 +128,24 @@ HEADERS += \
     src/common/disk_legacy.h \
     src/common/file_writer.h \
     src/display/qt/dialogs/filter_graph_dialog.h \
-    src/display/qt/subclasses/InteractibleNodeGraphNode_filter_graph_nodes.h
+    src/display/qt/subclasses/InteractibleNodeGraphNode_filter_graph_nodes.h \
+    src/display/qt/dialogs/about_dialog.h \
+    src/display/qt/dialogs/record_dialog.h \
+    src/display/qt/dialogs/output_resolution_dialog.h \
+    src/display/qt/dialogs/input_resolution_dialog.h
 
 FORMS += \
-    src/display/qt/windows/ui/control_panel_window.ui \
     src/display/qt/windows/ui/output_window.ui \
     src/display/qt/dialogs/ui/video_and_color_dialog.ui \
     src/display/qt/dialogs/ui/overlay_dialog.ui \
     src/display/qt/dialogs/ui/resolution_dialog.ui \
     src/display/qt/dialogs/ui/alias_dialog.ui \
     src/display/qt/dialogs/ui/anti_tear_dialog.ui \
-    src/display/qt/widgets/ui/control_panel_about_widget.ui \
-    src/display/qt/widgets/ui/control_panel_record_widget.ui \
-    src/display/qt/widgets/ui/control_panel_output_widget.ui \
-    src/display/qt/widgets/ui/control_panel_input_widget.ui \
-    src/display/qt/dialogs/ui/filter_graph_dialog.ui
+    src/display/qt/dialogs/ui/filter_graph_dialog.ui \
+    src/display/qt/dialogs/ui/about_dialog.ui \
+    src/display/qt/dialogs/ui/record_dialog.ui \
+    src/display/qt/dialogs/ui/output_resolution_dialog.ui \
+    src/display/qt/dialogs/ui/input_resolution_dialog.ui
 
 # C++. For GCC/Clang/MinGW.
 QMAKE_CXXFLAGS += -g

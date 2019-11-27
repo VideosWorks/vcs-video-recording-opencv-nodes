@@ -30,187 +30,276 @@ The VisionAV range of cards should also work, albeit without their audio capture
 
 In general, if you know that your card supports Datapath's RGBEasy API, it should be able to function with VCS.
 
-# How to use VCS
-*This section is work-in-progress.*
+# Usage
+Contents:
+- [Setting up](#setting-up)
+- [Output window](#output-window)
+    - Interacting with the output window
+- [Dialogs](#dialogs)
+    - Video & color dialog
+    - Alias resolutions dialog
+    - Record dialog
+    - Input resolution dialog
+    - Output resolution dialog
+    - Anti-tear dialog
+    - Filter graph dialog
+- [Mouse and keyboard shortcuts](#mouse-and-keyboard-shortcuts)
+- [Command-line](#command-line)
 
 ## Setting up
-Assuming you've installed the drivers for your capture hardware, and unpacked the binary distribution of VCS (linked to, above) into a folder, getting VCS going is simply a matter of running its `vcs.exe` executable.
+Assuming you've installed the drivers for your capture hardware, as well as unpacked the binary distribution of VCS (linked to, above) into a folder, getting VCS going is simply a matter of running its `vcs.exe` executable.
 
-When you run the executable, three windows open: a console window, in which notifications about VCS's status will apear during operation; the [output window](#the-output-window), in which captured frames will be displayed; and the [control panel](#the-control-panel), from which you can control aspects of VCS's operation.
+When you run the executable, two windows will open: a console window, in which notifications about VCS's status will appear during operation; and the [output window](#output-window), in which captured frames are displayed.
 
-- Note: You can launch `vcs.exe` with certain command-line parameters to automate tasks like loading up settings files. A list of the available command-line parameters is given in the [Command-line](#command-line) subsection.
+- Note: You can launch `vcs.exe` with command-line parameters to automate certain start-up tasks. A list of the command-line options is given in the [command-line](#command-line) section.
 
-One of the first things you'll probably want to do after getting VCS up and running is to adjust the video parameters, like phase, image positioning, color balance, and so on, to get the output from the capture hardware to look as it should. You can get all that done through VCS, and the sections below will tell you how. (If you're in a hurry, you can [jump straight to the part that shows you where to adjust the video settings](#input-tab).)
+When running VCS for the first time, the first thing you may want to do is adjust the capture video parameters, like phase, color balance, and so on. These can be set up via the [video & color dialog](#video-&-color-dialog).
 
-## The output window
-The central feature of VCS is the output window, where the captured frame data is displayed in real-time as it arrives from the capture hardware.
+## Output window
+The central point of the VCS user interface is the output window, where captured frames are displayed as they arrive from the capture hardware.
 
-The output window has been kept free of unnecessary clutter &ndash; there are no visible controls, only a couple of bits of convenient information in the window's title bar. This allows you to concentrate fully on the capture output.
+![](images/screenshots/v1.6.2/output-window.png)\
+*The output window, showing a Windows 98 desktop being captured.*
 
-![](images/screenshots/v1.4.1/output-window.png)
-
-### Hidden functionality in the output window
-To tell you a secret, there _is_ some hidden functionality to the output window, despite it having no visible controls per se.
-
+### Interacting with the output window
 #### Magnifying glass
-If you press and hold the right mouse button over the output window, a portion of the output image under the cursor will be magnified.
+If you press and hold the right mouse button over the output window, the portion of the image under the cursor will be magnified.
 
-The magnifying glass can be useful if, for instance, you're adjusting the capture's video parameters, like phase, and want to inspect the output for any smaller artefacts remaining.
+- Note: The magnifying glass is not available with the OpenGL renderer.
 
-![](images/screenshots/v1.4.1/output-window-nonmagnified-small.png)
-![](images/screenshots/v1.4.1/output-window-magnified-small.png)
+#### Dragging
+You can drag the output window by left-clicking anywhere on the window.
 
 #### Borderless mode
-You can double-click inside the output window to toggle the output window's border on and off.
+You can double-click inside the output window to toggle its border on/off.
 
-By scaling the output size (via the control panel's [output tab](#output-tab)) to match the size of your display, you can emulate a fullscreen mode, where the borderless output window fills the entire display.
-
-When the border is toggled off, the window is automatically snapped to the top left corner of the screen.
-
-While borderless, you can drag the window by grabbing anywhere on it with the left mouse button.
-
-![](images/screenshots/v1.4.1/output-window-small.png)
-![](images/screenshots/v1.2.6/output-window-borderless-small.png)
+- Note: When the border is toggled off, the window will also snap to the top left corner of the screen.
 
 #### Fullscreen mode
-Although you can emulate a fullscreen mode by toggling the output window's border off and scaling the window to fit the display, as described above, there is also a 'true' fullscreen mode available. You can toggle it on and off with the F11 shortcut key.
+Although you can emulate a fullscreen mode by turning off the output window's border and scaling the window to the size of the the display area, there is also a true fullscreen mode available. You can toggle it with the F11 shortcut key.
 
-The fullscreen mode may be of most benefit in tandem with the OpenGL renderer (toggleable on the control panel's [output tab](#output-tab)), as this combination may allow your display driver to take advantage of adaptive sync, if available on your system.
+For the fullscreen mode to work optimally, you may first need to resize the output window to match the resolution of your screen (see the [output resolution dialog](#output-resolution-dialog)).
 
-For the fullscreen mode to work best, you may first want to set the output size &ndash; via the control panel's [output tab](#output-tab) &ndash; to match the resolution of your screen. VCS's aspect ratio correction, for instance, may not work properly, otherwise.
+#### Resizing
+The output window cannot be resized directly. Instead, you can use the [output resolution dialog](#output-resolution-dialog) to adjust the window's size.
 
 #### Scaling with the mouse wheel
-By scrolling the mouse wheel over the output window, you can scale the size of the window up and down. This is a shortcut for the `Relative scale` option in the control panel's [output tab](#output-tab).
+By scrolling the mouse wheel over the output window, you can scale the size of the window up and down.
 
-Mouse wheel scaling is not available while recording video, or when it has been specifically disabled via the control panel's [output tab](#output-tab).
+- Note: Mouse wheel scaling is not available while recording video.
 
-#### Quick access to the overlay editor
-You can click inside the capture window with the middle mouse button to open the overlay editor.
+This is a shortcut for the `relative scale` setting in the [output resolution dialog](#output-resolution-dialog).
 
-## The control panel
-The control panel is the heart of VCS. With it, you can control the various aspects of how the capture hardware conducts its operation, how VCS displays the captured frames, and so on.
+#### Menu bar
+The output window contains an auto-hiding menu bar, from which you can access the various controls and dialogs of VCS.
 
-The controls and information in the control panel are divided thematically into four tabs: `Input`, `Output`, `Log`, and `About`. Below, you'll find descriptions of each tab and the functionality they provide.
+The menu bar will be displayed when you hover the mouse cursor over the output window; and hidden after a few seconds of mouse inactivity.
 
-### Input tab
-The `Input` tab lets you view and control the parameters related to the capture hardware's current input channel.
+The menu bar is divided into four categories: `File`, `Input`, `Output`, and `About`. The following is a list of the options available.
 
-If your capture hardware has multiple input channels, you can switch between them using the drop-down selector at the top of the `Input` tab. (The screenshot was taken with capture disabled, so the selector is showing no text; but normally you'd see it displaying "Channel #1" or the like.)
+##### Menu bar: File
+`File` &rarr; `Exit`\
+Exit VCS.
 
-![](images/screenshots/v1.5.1/control-panel-input.png)
+##### Menu bar: Input
+`Input` &rarr; `Channel`\
+Set the hardware capture channel. Depending on the capabilities of your capture hardware, channels #1 through #2 are available.
 
-**Signal.** The type of input signal currently being received by the capture hardware.
+`Input` &rarr; `Color depth`\
+Set the color depth with which frames are captured. This is a hardware-level setting: the capture hardware will convert each frame to this color depth before uploading it to system memory - thus lower color depths consume less bandwidth. Prior to display, VCS will convert the frames to the color depth of the [output window](#output-window).
+ 
+`Input` &rarr; `Video...`\
+Open the [video & color](#video-&-color-dialog) dialog.
 
-**Video mode.** The resolution and refresh rate of the input signal currently being received by the capture hardware.
+`Input` &rarr; `Aliases...`\
+Open the [alias resolutions](#alias-resolutions-dialog) dialog.
 
-**Frame skip.** Skip every *n*th frame. This is a hardware-level setting: the skipping is done by the capture card, and the intermediate frames are never uploaded to the system or received by VCS.
+`Input` &rarr; `Resolution...`\
+Open the [input resolution](#input-resolution-dialog) dialog.
 
-**Color depth.** Set the color depth with which the captured frames are displayed. This is a hardware-level setting: the capture card will convert each frame to this color depth before uploading it to the system; so lower color depths consume less system bandwidth. VCS will convert the frames back to the full color depth of its output window for display, although any fidelity lost in a previous conversion will remain.
+##### Menu bar: Output
+`Output` &rarr; `Renderer`\
+Set the type of rendering VCS uses to draw captured frames onto the [output window](#output-window).
 
-**Alias resolutions.** Define alias resolutions. An alias resolution is a resolution that you want to force the capture hardware into when it proposes another resolution. For instance, if you know that the capture source's resolution is 512 x 384, but the capture hardware detects it as 511 x 304, you can assign 511 x 304 as an alias of 512 x 384. After that, every time the capture hardware sets its input resolution to 511 x 304, VCS will tell it to use 512 x 384, instead.
+- &rarr; `Software`: Most compatible option. Rendering is done on the CPU.
+- &rarr; `OpenGL`: Rendering is done on the GPU using OpenGL.
 
-**Adjust video & color.** Adjust various capture parameters, like color balance, phase, horizontal position, etc. The settings are specific to the current input resolution, and will be recalled automatically by VCS each time this resolution is entered. If you have defined no settings for the current input resolution, VCS will use its default ones. Remember to save any custom settings before you exit VCS, if you want to keep them. The settings are hardware-level and will be enforced by the capture hardware.
+When choosing the renderer, be mindful of the following:
+- The OpenGL renderer might not work in Windows XP.
+- The output window's magnifying glass feature is not available with the OpenGL renderer.
 
-**Force input resolution.** Tell the capture hardware to adopt a particular input resolution. If the capture source's resolution doesn't match the capture hardware's input resolution, the captured frames will likely not display correctly in VCS. If you click on a button while holding down the Alt key, you can change the resolution assigned to that button. The `Other...` button lets you specify an arbitrary resolution.
+`Output` &rarr; `Aspect ratio`\
+Set the aspect ratio to display captured frames in. Letterboxing will be used to achieve the desired ratio.
 
-### Output tab
-The `Output` tab lets you view and control the parameters related to VCS's output of captured frames.
+- &rarr; `Native`: Display frames in the full size of the [output window](#output-window), without letterboxing.
+- &rarr; `Traditional 4:3`: Use 4:3 aspect ratio for resolutions that historically might have been meant to be displayed as such. These include 720 x 400, 640 x 400, and 320 x 200.
+- &rarr; `Always 4:3`: Display all frames in 4:3 aspect ratio.
 
-![](images/screenshots/v1.5.1/control-panel-output.png)
+`Output` &rarr; `Upscaler`\
+Set the scaler to be used when frames are upscaled to fit the [output window](#output-window).
 
-**Renderer.** Set the type of rendering VCS uses to draw captured frames onto the [output window](#the-output-window). The _software_ renderer should be the most compatible option. The _OpenGL_ renderer may offer e.g. compatibility with adaptive synchronization technologies.
-- The _OpenGL_ renderer may not work in Windows XP.
-- The [magnifying glass](#magnifying-glass) is not available when using the _OpenGL_ renderer.
+`Output` &rarr; `Downscaler`\
+Set the scaler to be used when frames are downscaled to fit the [output window](#output-window).
 
-**Resolution.** The current output resolution. This will be the size of the output window.
+`Output` &rarr; `Record...`\
+Open the [record](#record-dialog) dialog.
 
-**Frame rate.** The number of frames passing through the capture pipeline 
-per second. The pipeline consists of the following stages: a frame being received by VCS from the capture card, the frame being scaled and filtered, and the frame being drawn on VCS's output window.
+`Output` &rarr; `Overlay...`\
+Open the [overlay](#overlay-dialog) dialog.
 
-**Latency.** If the capture card sends VCS a new frame before VCS has finished processing the previous one, the new frame will be ignored, and this will display "Dropping frames". Otherwise, all frames sent by the capture card are being processed and displayed by VCS in a timely manner, and this shows "No problem".
+`Output` &rarr; `Anti-tear...`\
+Open the [anti-tear](#anti-tear-dialog) dialog.
 
-**Filters.** Create sets of image filters to be applied to incoming frames. You can find more information about custom filtering in the [Custom filters](#custom-filters) subsection.
+`Output` &rarr; `Resolution...`\
+Open the [output resolution](#output-resolution-dialog) dialog.
 
-**Anti-tear.** Enable automatic removal of image tears from captured frames. Tearing can result, for instance, when the capture source is displaying a non-v-synced application: capturing DOS games often results in torn frames, as does capturing games in general whose FPS is less than or more than the refresh rate. The anti-tearing will not work in all cases &ndash; for instance, when the capture source's application is redrawing its screen at a rate higher than the refresh rate, e.g. at more than 60 FPS. You can find more information about anti-tearing in the [Anti-tearing](#anti-tearing) subsection.
+`Output` &rarr; `Filter graph`\
+Open the [filter graph](#filter-graph-dialog) dialog.
 
-**Overlay.** Create a message to be overlaid on the [output window](#the-output-window) during capture. You can enter custom text or images, choose from several variables that update in real-time, and apply styling with HTML and CSS. Note that the overlay will only be shown while a signal is being received from the capture hardware.
+##### Menu bar: Help
+`Help` &rarr; `About...`\
+Display information about VCS and the capture hardware.
 
-**Resolution (adjustable).** Set a custom output resolution, i.e. the resolution to which all captured frames will be scaled prior to being displayed in the [output window](#the-output-window).
+## Dialogs
+The VCS user interface includes a number of dialogs, with which you can adjust the program's operational parameters.
 
-**Relative scale.** Scale captured frames by a percentage relative to the resolution set in the `Output size` field.
+Contents:
+- [Video & color dialog](#video-&-color-dialog)
+- [Alias resolutions dialog](#alias-resolutions-dialog)
+- [Record dialog](#record-dialog)
+- [Input resolution dialog](#input-resolution-dialog)
+- [Output resolution dialog](#output-resolution-dialog)
+- [Anti-tear dialog](#anti-tear-dialog)
+- [Filter graph dialog](#filter-graph-dialog)
 
-**Aspect.** When displaying captured frames, conserve a desired aspect ratio. If disabled, frames will be stretched to fully fit the size of the [output window](#the-output-window). The following aspect ratio modes are available:
-- `Native` Conserve each frame's original aspect ratio. A frame of 720 x 400 will be displayed with an aspect ratio of 9:5, and a frame of 640 x 480 with 4:3.
-- `Traditional 4:3` Certain older, non-4:3 resolutions &ndash; like 720 x 400, 640 x 400, and 320 x 200 &ndash; were sometimes intended to be displayed in a 4:3 aspect. This mode sets a 4:3 aspect ratio for those resolutions, and otherwise acts like the `Native` mode.
-- `Always 4:3` All frames will be displayed in a 4:3 aspect.
+### Video & color dialog
+To access: Ctrl+V or [Menu bar](#menu-bar) &rarr; `Input` &rarr; `Video...`
 
-**Upscaler.** Set the type of scaling to be used when the output resolution is larger than the input resolution. Any relevant custom filtering (see below) will override this setting.
+The video & color dialog lets you to modify the capture hardware's video parameters.
 
-**Downscaler.** Set the type of scaling to be used when the output resolution is smaller than the input resolution. Any relevant custom filtering (see below) will override this setting.
+![](images/screenshots/v1.6.2/video-color-dialog.png)\
+*The video & color dialog, showing controls for adjusting the capture hardware's video parameters.*
 
-### Record tab
-On the `Record` tab, you can tell VCS record captured frames &ndash; as they are displayed on its [output window](#the-output-window) &ndash; into a video.
+Any changes you make to the settings will be sent to the capture hardware in real-time, and are reflected accordingly in the [output window](#output-window).
 
-**Note!**
-- The recorder will record video only. Audio will not be recorded.
-- The resolution of the video will be that of the current output size, settable via the control panel's [output tab](#output-tab).
-- The output size cannot be changed while recording video. All frames will be scaled &ndash; with padding as needed to maintain their aspect ratios &ndash; to fit the video's resolution.
-- The overlay will not be recorded.
+The settings are specific to the current capture resolution, and will be recalled automatically by VCS whenever that capture resolution is used. For instance, if the current resolution is 640 x 480 and you modify a parameter whose default value is 5 to make it 10, VCS will assign this parameter a value of 10 whenever the resolution is 640 x 480, and 5 otherwise. Following that, if the resolution is 800 x 600 and you now set the parameter to 7, the parameter will be assigned a value of 7 whenever the resolution is 800 x 600, 10 whenever the resolution is 640 x 480, and 5 for any other resolution.
 
-![](images/screenshots/v1.5.1/control-panel-record.png)
+- Note: Settings cannot be defined per refresh rate. Thus, the capture modes 640 x 480 @ 60 Hz and 640 x 480 @ 55 Hz both cause VCS to recall the settings for 640 x 480.
 
-The built-in recording functionality in VCS outputs videos in the H.264 format using the x264 codec, which is capable of producing a very good (virtually lossless) image quality at reasonable file sizes.
+If you want your settings to persist after you exit VCS, remember to save them first. This can be done via `File` &rarr; `Save settings as...`.
 
-Before being able to record video with VCS, you need to install the [x264vfw](https://sourceforge.net/projects/x264vfw/files/x264vfw/44_2851bm_44825/) codec, and run its configurator at least once, so that its settings are added into the Windows registry for VCS to find.
+Saved settings can be restored via `File` &rarr; `Load settings...`.
 
+### Alias resolutions dialog
+To access: [Menu bar](#menu-bar) &rarr; `Input` &rarr; `Aliases...`
+
+With the alias resolutions dialog, you can tell VCS to automatically override certain input resolutions.
+
+![](images/screenshots/v1.6.2/alias-resolutions-dialog.png)\
+*The alias resolutions dialog, showing controls for creating and managing aliases.*
+
+For instance, if you find that your capture hardware is incorrectly initializing 640 x 400 as 512 x 488 (or something of that sort), you can define 640 x 400 as an alias of 512 x 488. Now, whenever the capture hardware sets the input resolution to 512 x 488, VCS will instruct it to change it to 640 x 400.
+
+### Record dialog
+To access: Ctrl+R or [Menu bar](#menu-bar) &rarr; `Output` &rarr; `Record...`
+
+The record dialog gives you the option to stream captured frames into a video file.
+
+![](images/screenshots/v1.6.2/record-dialog.png)\
+*The record dialog, showing controls for recording captured frames into a video file.*
+
+The recording functionality will write frames as they appear in the [output window](#output-window) into a video file. But make note of the following:
+
+- Audio will not be recorded.
+- The video will be recorded in the H.264 format using an x264 codec.
+- The video resolution will be that of the current output size (see the [output resolution dialog](#output-resolution-dialog)).
+- The output size cannot be changed while recording; frames will be scaled to fit the current size.
+- The [overlay](#overlay-dialog) will not be recorded.
+
+To make use of VCS's recording functionality on Windows, you will need to install the 32-bit version of the [x264vfw](https://sourceforge.net/projects/x264vfw/files/x264vfw/44_2851bm_44825/) codec and run its configurator at least once, so that its settings are added into the Windows registry for VCS to find.
+
+#### Recording settings
 **Frame rate.** The video's nominal playback rate. Typically, you will want to match this to the capture source's refresh rate, so that e.g. a 60 Hz capture signal is recorded with a frame rate of 60.
 
-**Linear sampling.** Whether VCS is allowed to duplicate and/or skip frames to match the captured frame rate with the video's nominal playback rate. If linear sampling is disabled, captured frames will be inserted into the video as they are received, and are never duplicated or skipped by the video recorder. Disabling linear sampling may result in smoother-looking playback when the capture frame rate is stable; but enabling it will help prevent time compression if the input frame rate is uneven. If you are planning to append the video with an audio track you recorded at the same time, you will most likely want to enable linear sampling when recording the video, or it may not be able to keep in sync with the audio.
-- While the capture hardware is reporting 'no signal', no frames will be inserted into the video, regardless of whether linear sampling is enabled.
+**Linear sampling.** Whether VCS is allowed to duplicate and/or skip frames to match the captured frame rate with the video's nominal playback rate. If linear sampling is disabled, captured frames will be inserted into the video as they are received, and are never duplicated or skipped to maintain time-coherency. Disabling linear sampling may result in smoother-looking playback when the capture frame rate is uneven; but enabling it will help prevent time compression in these cases. If you are planning to append the video with an audio track you recorded at the same time, you will most likely want to enable linear sampling or the video may not keep in sync with the audio.
+
+- Note: While the capture hardware reports 'no signal', no frames will be recorded, regardless of whether linear sampling is enabled.
 
 **Video container.** The file format in which the video is saved. On Windows, the AVI format is used.
 
 **Video codec.** The encoder with which to create the video. On Windows, the 32-bit version of x264vfw is used.
 
-**Options specific to H.264 encoding.** Settings like `Profile`, `Pixel format`, and `Preset` are available to you for customizing the encoding process. Further descriptions of what these settings do can be found in sources specific to H.264. In brief, if you want the best image quality, you can set `Profile` to "High 4:4:4", `Pixel format` to "RGB", and `CRF` to 1. To maintain high image quality but reduce the file size, you can set `Preset` to "Veryfast" or "Faster" instead of "Superfast" or "Ultrafast", and increase `CRF` from 1 to 10&ndash;15.
+**Additional x264 arguments.** You can provide the encoder with custom command-line parameters via this field.
 
-**Video.** As the recording runs, you will receive real-time information about its status, here.
-- `Resolution` The video's resolution and nominal playback rate.
-- `Input FPS` An estimate of the number of frames being inserted per every second of video.
-- `Size on disk` How many megabytes the video file is taking up, at present.
-- `Duration` The video's duration, so far; in hours, minutes, and seconds.
+For best image quality regardless of performance and/or file size, set `profile` to "High 4:4:4", `pixel format` to "RGB", `CRF` to 1, and `preset` to "ultrafast". To maintain high image quality but reduce the file size, you can set `preset` to "veryfast" or "faster", and increase `CRF` to 10&ndash;15. For more tips and tricks, you can look up documentation specific to the x264 encoder.
 
-### About tab
-The `About` tab provides metainformation about VCS; and also contains details about the underlying capture hardware, like its maximum capture resolution, driver and firmware versions, etc.
+### Input resolution dialog
+To access: Ctrl+I or [Menu bar](#menu-bar) &rarr; `Input` &rarr; `Resolution...`
 
-## Custom filters
-*Coming.*
+The input resolution dialog lets you override the capture hardware's current capture resolution.
 
-![](images/screenshots/v1.5.1/filter-graph-dialog.png)
+![](images/screenshots/v1.6.2/input-resolution-dialog.png)\
+*The input resolution dialog, showing controls for adjusting the capture resolution.*
 
-## Alias resolutions
-*Coming.*
+Normally, the capture hardware will automatically set the capture resolution to match that of the input signal. But sometimes the result is sub-optimal, and you may want to manually override it.
 
-## Anti-tearing
-Under some circumstances, like when capturing DOS games, you may find that the captured frames contain tearing artefacts. This is most likely caused by the capture hardware having sampled an incompletely drawn frame from the source signal &ndash; for instance, due to the source not syncing its rendering to its refresh rate. A tear, then, results as the visible edge between the incompletely drawn new frame, and the still partially visible previous frame.
+The dialog's buttons will tell the capture hardware to set a particular input resolution regardless of what the hardware thinks is the correct resolution for the input signal.
 
-VCS comes with some facilities for reducing tearing artefacts. You can enable anti-tearing from the control panel's `Output` tab, by marking the `Anti-tear` check-box.
+- Note: The `other...` button lets you specify a custom resolution, in case the pre-set ones are not suitable.
 
-![](images/screenshots/v1.5.1/control-panel-output.png)
+You can change a button's assigned resolution by clicking on it while holding down the Alt key.
 
-Anti-tearing in VCS works by accumulating the incoming frame data from the capture hardware into an off-screen frame buffer, and displaying the buffer's contents in the output window only once all of the frame's data has been accumulated.
+### Output resolution dialog
+To access: Ctrl+O or [Menu bar](#menu-bar) &rarr; `Output` &rarr; `Resolution...`
 
-Noise inherent in analog capture causes some uncertainty, however, about which parts of an incoming frame are the new data to be accumulated, and which parts differ from the previous frame only due to irrelevant noise.
+The output resolution dialog lets you resize the output window. This also resizes the frames being displayed in the window.
 
-The accuracy with which the anti-tearing system can tell apart noise from legit changes between frames has a strong impact on the extent to which the system can remove tears. Currently, the system attempts this by sliding a horizontal sampling window along two adjacent frames' pixels, and comparing the sums of the pixel values within that window. If the sums differ by more than a given threshold, the entire row of pixels is condered new and accumulated into the frame buffer.
+![](images/screenshots/v1.6.2/output-resolution-dialog.png)\
+*The output resolution dialog, showing controls for adjusting the size of the output window.*
 
-You can view and adjust the relevant parameters of this operation by clicking the `Settings...` button next to the `Anti-tear` check-box on the control panel's `Output` tab. Depending on what you're capturing, you may find that the default values work well enough; but in other cases, you may have better results by trying different values.
+Normally, the size of the [output window](#output-window) will match the capture resolution, but you can use this dialog to scale the window up or down.
 
-**Range offsets.** Set the vertical range inside which the anti-tearing accumulates frame data. Static content, like a game's UI bars at the top or bottom of the screen, can completely throw off the system, and need to be excluded from consideration. The anti-tearing will ignore the first _up_ pixel rows and the last _down_ pixel rows in each frame. You can enable `Visualization` to see the values of _up_ and _down_ as corresponding vertical lines in the output window, allowing you to more easily align them with the content.
+- Note: The output resolution controls are not available while recording video (see the [record dialog](#record-dialog)).
+
+#### Settings
+
+**Override.** Lock the size of the output window, so that changes to the capture resolution do not resize it. Frames will be scaled up or down as needed to match this resolution.
+
+**Relative scale.** Scale the size of the output window up or down by a percentage of its base size. The base size is either the capture resolution, or, if enabled, the override resolution.
+
+### Overlay dialog
+To access: Ctrl+L or [Menu bar](#menu-bar) &rarr; `Output` &rarr; `Overlay...`
+
+The overlay dialog lets you define a message to be overlaid on the [output window](#output-window).
+
+![](images/screenshots/v1.6.2/overlay-dialog.png)\
+*The overlay dialog, showing controls for overlaying a message on the output window.*
+
+You can combine normal text with pre-set VCS variables and HTML/CSS formatting to create a message to be shown over the output window.
+
+- Note: The overlay will not be included in videos recorded using VCS's built-in recording functionality (see the [record dialog](#record-dialog)).
+
+### Anti-tear dialog
+To access: Ctrl+A or [Menu bar](#menu-bar) &rarr; `Output` &rarr; `Anti-tear...`
+
+The anti-tear dialog provides functionality to remove tearing from captured frames.
+
+![](images/screenshots/v1.6.2/antitear-dialog.png)\
+*The anti-tear dialog, showing controls for adjusting the parameters of VCS's anti-tear engine.*
+
+Under some circumstances, such as when the captured source does not sync its rendering with the refresh rate, you may find that the captured frames contain horizontal tearing. VCS comes with an anti-tear engine to help mitigate this problem.
+
+- Note: The anti-tearing is not 100% perfect, in that not absolutely all tears are eliminated. But it should provide a considerable improvement nonetheless.
+
+Anti-tearing can be considered an experimental feature of VCS. It works quite well in many cases, but can fail in others, and may be a performance hog. The default settings should work well enough in most cases, although you will likely need to adjust the range offsets (see below).
+
+#### Settings
+
+**Range offsets.** Set the vertical range inside which the anti-tearing operates. Static content, like a game's UI bar at the top or bottom of the screen, can prevent the anti-tearing from working, and you should set this range so as to exclude such content. You can enable `visualization` to see the range represented with horizontal lines in the [output window](#output-window).
 
 **Visualization.** Draw certain anti-tearing-related markers in the output window.
 
-**Threshold.** Set the maximum amount by which pixel color values are allowed to change between two frames without being considered new data. The less noise there is in the capture, the lower you can set this value; and vice versa.
+**Threshold.** Set the maximum amount by which pixel color values are allowed to change between two frames without being considered new data. The less noise there is in the capture, the lower you can set this value.
 
 **Domain width.** Set the size of the sampling window. A lower value reduces CPU usage, but may be less able to detect subtle tearing.
 
@@ -218,9 +307,21 @@ You can view and adjust the relevant parameters of this operation by clicking th
 
 **Matches req'd.** Set how many times on a row of pixels the sums of the sampling window need to exceed the threshold for that row of pixels to be considered new data.
 
-**Update direction.** _n/a_
+### Filter graph dialog
+To access: Ctrl+F or [Menu bar](#menu-bar) &rarr; `Output` &rarr; `Filter graph...`
 
-In general, anti-tearing is an experimental feature in VCS. It works quite well in many cases, but can fail in others, and may be a performance hog unless you have a fast CPU.
+The filter graph dialog allows you to create chains of image filters to be applied to captured frames prior to display in the [output window](#output-window).
+
+![](images/screenshots/v1.6.2/filter-graph-dialog.png)\
+*The filter graph dialog, showing controls for creating and modifying filter chains.*
+
+The filter graph is made up of nodes that can be connected together in a chain. These nodes come in three varieties: `input gate`, `output gate`, and `filter`.
+
+The input and output gates determine the resolutions for which the connected filters will be applied. For instance, if you set an input gate's width and height to 640 and 480, and the width and height of an output gate to 1920 and 1080, any filters you connect between these two nodes will be applied when the size of the output window is 1920 x 1080 and the original resolution of the frames (i.e. the capture resolution) is 640 x 480. You can also use the value 0 for a gate's width and/or height to allow VCS to match any value to that dimension: an input gate with a width and height of 0, for instance, will apply the connected filters to frames of all capture resolutions, provided that they also meet the resolution specified for the output gate. A filter graph can have multiple chains of these input-filter-output combos, and VCS will select the most suitable one (or none) given the current capture and output resolutions.
+
+- Note: When deciding which of multiple filter chains to use, VCS will prefer more specific chains to more general ones. If you have e.g. an input gate whose width and height are 0, and another input gate whose width and height are 640 and 480, the latter will be used when the capture resolution is exactly 640 x 480, and the former otherwise. Likewise, if your input gates are 0 x 0 and 640 x 0, the former will be applied for capture resolutions of *any* x *any*, except for 640 x *any*, where the latter chain will apply - except if you also have a third input gate of 640 x 480, in which case that will be used when the capture resolution is exactly 640 x 480.
+
+To connect two nodes, click and drag with the left mouse button from one node's output edge (square) to another's input edge (circle), or vice versa. A node can be connected to as many other nodes as you like. To disconnect a node from another, right-click on the node's output edge, and select the other node from the list that pops up. To remove a node itself from the graph, right-click on the node and select to remove it. To add nodes to the graph, select `Add` from the dialog's menu bar.
 
 ## Mouse and keyboard shortcuts
 You can make use of the following mouse and keyboard shortcuts:
@@ -246,11 +347,19 @@ F11 ..................... Toggle fullscreen mode on/off.
 
 Ctrl + A ................ Open the anti-tear dialog.
 
-Ctrl + F ................ Open the filter sets dialog.
+Ctrl + F ................ Open the filter graph dialog.
 
 Ctrl + V ................ Open the video settings dialog.
 
-Ctrl + O ................ Toggle the output overlay on/off.
+Ctrl + I ................ Open the input resolution dialog.
+
+Ctrl + O ................ Open the output resolution dialog.
+
+Ctrl + R ................ Open the record dialog.
+
+Ctrl + L ................ Open the overlay dialog.
+
+Ctrl + Shift + key ...... Toggle the corresponding dialog's functionality on/off.
 
 Ctrl + 1 to 9 ........... Shortcuts for the input resolution buttons on the
                           control panel's Input tab.
@@ -266,9 +375,9 @@ Optionally, you can pass one or more of following command-line arguments to VCS:
                           up. Capture parameter files typically have the .vcsm
                           or .vcs-video suffix.
 
--f <path + filename> .... Load custom filter sets from the given file on start-
-                          up. Filter set files typically have the .vcsf or
-                          .vcs-filterset suffix.
+-f <path + filename> .... Load a custom filter graph from the given file on
+                          start- up. Filter graph files typically have the .vcs-
+                          filter-graph suffix.
 
 -a <path + filename> .... Load alias resolutions from the given file on start-
                           up. Alias resolution files typically have the .vcsa
@@ -477,7 +586,7 @@ You are encouraged to have a fast CPU, since most of VCS's operations are perfor
 | 2x upscaled  | 1100    | 480    | 480  | 280   | 100     |
 | 3x upscaled  | 460     | 340    | 340  | 180   | 50      |
 
-Drawing frames onto the [output window](#the-output-window) using software rendering is likewise sufficiently fast, as shown in the following table. An input of 640 x 480 can be upscaled by 2x and drawn on screen at roughly 340 frames per second when using nearest-neighbor interpolation.
+Drawing frames onto the [output window](#output-window) using software rendering is likewise sufficiently fast, as shown in the following table. An input of 640 x 480 can be upscaled by 2x and drawn on screen at roughly 340 frames per second when using nearest-neighbor interpolation.
 
 | 640 x 480       | 1x<br>Nearest | 2x<br>Nearest | 3x<br>Nearest |
 |:--------------- |:-------------:|:-------------:|:-------------:|
@@ -495,5 +604,3 @@ Padding (i.e. aspect ratio correction) can incur a performance penalty with some
 The primary author of VCS is the one-man Tarpeeksi Hyvae Soft (see on [GitHub](https://github.com/leikareipa) and the [Web](http://www.tarpeeksihyvaesoft.com)).
 
 VCS uses [Qt](https://www.qt.io/) for its UI, [OpenCV](https://opencv.org/) for image filtering, and [Datapath](https://www.datapath.co.uk/)'s RGBEasy API for interfacing with the capture hardware.
-
-VCS embeds and makes use of the [Ubuntu font](https://design.ubuntu.com/font/), licensed under [Ubuntu Font Licence 1.0](https://www.ubuntu.com/legal/font-licence).

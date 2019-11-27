@@ -9,6 +9,7 @@
 #include "display/qt/subclasses/QGraphicsScene_interactible_node_graph.h"
 #include "display/qt/dialogs/filter_graph_dialog.h"
 #include "display/qt/widgets/filter_widgets.h"
+#include "display/qt/persistent_settings.h"
 #include "common/disk.h"
 #include "ui_filter_graph_dialog.h"
 
@@ -92,13 +93,19 @@ FilterGraphDialog::FilterGraphDialog(QWidget *parent) :
             this->menubar->addMenu(helpMenu);
         }
 
-        this->layout()->setMenuBar(menubar);
+        ui->widget_graphicsViewContainer->layout()->setMenuBar(menubar);
+    }
+
+    // Initialize the GUI controls to their default values.
+    {
+        ui->groupBox_filterGraphEnabled->setChecked(false);
+        this->menubar->setEnabled(false); // Enabled if filtering is enabled.
     }
 
     // Create and configure the graphics scene.
     {
         this->graphicsScene = new InteractibleNodeGraph(this);
-        this->graphicsScene->setBackgroundBrush(QBrush("#404040"));
+        this->graphicsScene->setBackgroundBrush(QBrush("#000000"));
 
         ui->graphicsView->setScene(this->graphicsScene);
 
@@ -125,6 +132,23 @@ FilterGraphDialog::FilterGraphDialog(QWidget *parent) :
         });
     }
 
+    // Connect the GUI controls to consequences for changing their values.
+    {
+        connect(ui->groupBox_filterGraphEnabled, &QGroupBox::toggled, this,
+                [=](const bool isEnabled)
+                {
+                    kf_set_filtering_enabled(isEnabled);
+                    kd_update_output_window_title();
+                    this->menubar->setEnabled(isEnabled);
+                });
+    }
+
+    // Restore persistent settings.
+    {
+        ui->groupBox_filterGraphEnabled->setChecked(kpers_value_of(INI_GROUP_OUTPUT, "custom_filtering", kf_is_filtering_enabled()).toBool());
+        this->resize(kpers_value_of(INI_GROUP_GEOMETRY, "filter_graph", this->size()).toSize());
+    }
+
     this->reset_graph(true);
 
     return;
@@ -132,6 +156,12 @@ FilterGraphDialog::FilterGraphDialog(QWidget *parent) :
 
 FilterGraphDialog::~FilterGraphDialog()
 {
+    // Save persistent settings.
+    {
+        kpers_set_value(INI_GROUP_OUTPUT, "custom_filtering", ui->groupBox_filterGraphEnabled->isChecked());
+        kpers_set_value(INI_GROUP_GEOMETRY, "filter_graph", this->size());
+    }
+
     delete ui;
 
     return;
@@ -362,4 +392,11 @@ FilterGraphNode* FilterGraphDialog::add_filter_graph_node(const filter_type_enum
                                                           const u8 *const initialParameterValues)
 {
     return add_filter_node(filterType, initialParameterValues);
+}
+
+void FilterGraphDialog::toggle_filtering(void)
+{
+    ui->groupBox_filterGraphEnabled->setChecked(!ui->groupBox_filterGraphEnabled->isChecked());
+
+    return;
 }

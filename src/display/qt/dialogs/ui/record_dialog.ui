@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>ControlPanelRecordWidget</class>
- <widget class="QWidget" name="ControlPanelRecordWidget">
+ <class>RecordDialog</class>
+ <widget class="QDialog" name="RecordDialog">
   <property name="geometry">
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>554</width>
-    <height>389</height>
+    <width>545</width>
+    <height>325</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Form</string>
+   <string>Dialog</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
@@ -24,7 +24,7 @@
      </property>
      <layout class="QHBoxLayout" name="horizontalLayout">
       <property name="spacing">
-       <number>3</number>
+       <number>6</number>
       </property>
       <property name="leftMargin">
        <number>0</number>
@@ -118,8 +118,8 @@
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>293</width>
-             <height>337</height>
+             <width>272</width>
+             <height>290</height>
             </rect>
            </property>
            <layout class="QVBoxLayout" name="verticalLayout_11">
@@ -133,7 +133,7 @@
              <number>9</number>
             </property>
             <property name="bottomMargin">
-             <number>9</number>
+             <number>0</number>
             </property>
             <item>
              <widget class="QFrame" name="frame_recordingSettings">
@@ -668,7 +668,7 @@
             </sizepolicy>
            </property>
            <property name="text">
-            <string>Record</string>
+            <string>Start</string>
            </property>
           </widget>
          </item>
@@ -684,7 +684,7 @@
             </sizepolicy>
            </property>
            <property name="text">
-            <string>Save</string>
+            <string>Stop 'n save</string>
            </property>
           </widget>
          </item>
@@ -693,6 +693,39 @@
       </layout>
      </item>
     </layout>
+   </item>
+   <item>
+    <spacer name="verticalSpacer">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeType">
+      <enum>QSizePolicy::Fixed</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>6</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+   <item>
+    <widget class="Line" name="line">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="label_notice">
+     <property name="text">
+      <string>This dialog records output frames into a video file.</string>
+     </property>
+     <property name="wordWrap">
+      <bool>true</bool>
+     </property>
+    </widget>
    </item>
   </layout>
  </widget>

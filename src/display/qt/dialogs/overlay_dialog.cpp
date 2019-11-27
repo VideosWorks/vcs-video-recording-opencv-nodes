@@ -29,13 +29,15 @@ OverlayDialog::OverlayDialog(QWidget *parent) :
 
     ui->setupUi(this);
 
-    this->setWindowTitle("VCS - Overlay Editor");
+    this->setWindowTitle("VCS - Overlay");
 
     // Don't show the context help '?' button in the window bar.
     this->setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
 
     // Set the GUI controls to their proper initial values.
     {
+        ui->groupBox_overlayEnabled->setChecked(false);
+
         // Create push button menus for inserting variables into the overlay.
         {
             // Adds an action into the given menu, such that when the action is
@@ -52,19 +54,27 @@ OverlayDialog::OverlayDialog(QWidget *parent) :
             };
 
             QMenu *capture = new QMenu(this);
-            add_action_to_menu(capture, "Input refresh rate (Hz)", "|inHz|");
-            add_action_to_menu(capture, "Output frame rate", "|outFPS|");
-            capture->addSeparator();
-            add_action_to_menu(capture, "Input resolution", "|inRes|");
-            add_action_to_menu(capture, "Output resolution", "|outRes|");
-            capture->addSeparator();
-            add_action_to_menu(capture, "Peak capture latency (ms)", "|msLatP|");
-            add_action_to_menu(capture, "Average capture latency (ms)", "|msLatA|");
-            ui->pushButton_capture->setMenu(capture);
+            {
+                QMenu *input = new QMenu("Input", this);
+                QMenu *output = new QMenu("Output", this);
+
+                add_action_to_menu(input, "Resolution", "$inputResolution");
+                add_action_to_menu(input, "Refresh rate (Hz)", "$inputHz");
+
+                add_action_to_menu(output, "Resolution", "$outputResolution");
+                add_action_to_menu(output, "Frame rate", "$outputFPS");
+                add_action_to_menu(output, "Frames dropped?", "$areFramesDropped");
+                add_action_to_menu(output, "Peak capture latency (ms)", "$peakLatencyMs");
+                add_action_to_menu(output, "Average capture latency (ms)", "$averageLatencyMs");
+
+                capture->addMenu(input);
+                capture->addMenu(output);
+                ui->pushButton_capture->setMenu(capture);
+            }
 
             QMenu *system = new QMenu(this);
-            add_action_to_menu(system, "Time", "|sysTime|");
-            add_action_to_menu(system, "Date", "|sysDate|");
+            add_action_to_menu(system, "Time", "$systemTime");
+            add_action_to_menu(system, "Date", "$systemDate");
             ui->pushButton_system->setMenu(system);
 
             QMenu *formatting = new QMenu(this);
@@ -83,12 +93,16 @@ OverlayDialog::OverlayDialog(QWidget *parent) :
         }
     }
 
+    // Connect the GUI controls to consequences for changing their values.
+    {
+        connect(ui->groupBox_overlayEnabled, &QGroupBox::toggled, this, [=]{kd_update_output_window_title();});
+    }
+
     // Restore persistent settings.
     {
-        this->resize(kpers_value_of(INI_GROUP_GEOMETRY, "overlay", size()).toSize());
-
-        // Load the previous overlay from disk, if such was saved.
         ui->plainTextEdit->setPlainText(kpers_value_of(INI_GROUP_OVERLAY, "content", "").toString());
+        ui->groupBox_overlayEnabled->setChecked(kpers_value_of(INI_GROUP_OVERLAY, "enabled", false).toBool());
+        this->resize(kpers_value_of(INI_GROUP_GEOMETRY, "overlay", this->size()).toSize());
     }
 
     return;
@@ -98,8 +112,9 @@ OverlayDialog::~OverlayDialog()
 {
     // Save persistent settings.
     {
+        kpers_set_value(INI_GROUP_OVERLAY, "enabled", ui->groupBox_overlayEnabled->isChecked());
         kpers_set_value(INI_GROUP_OVERLAY, "content", ui->plainTextEdit->toPlainText());
-        kpers_set_value(INI_GROUP_GEOMETRY, "overlay", size());
+        kpers_set_value(INI_GROUP_GEOMETRY, "overlay", this->size());
     }
 
     delete ui;
@@ -152,17 +167,17 @@ QString OverlayDialog::parsed_overlay_string(void)
     const auto inRes = kc_hardware().status.capture_resolution();
     const auto outRes = ks_output_resolution();
 
-    parsed.replace("|inRes|", QString("%1 x %2").arg(inRes.w).arg(inRes.h));
-    parsed.replace("|outRes|", QString("%1 x %2").arg(outRes.w).arg(outRes.h));
-    parsed.replace("|inHz|", QString::number(kc_hardware().status.signal().refreshRate));
-    parsed.replace("|outFPS|", QString::number(kd_output_framerate()));
-    parsed.replace("|strLat|", (kc_are_frames_being_missed()? "Dropping frames" : ""));
-    parsed.replace("|msLatP|", QString::number(kd_peak_pipeline_latency()));
-    parsed.replace("|msLatA|", QString::number(kd_average_pipeline_latency()));
-    parsed.replace("|sysTime|", QDateTime::currentDateTime().time().toString());
-    parsed.replace("|sysDate|", QDateTime::currentDateTime().date().toString());
+    parsed.replace("$inputResolution", QString("%1 x %2").arg(inRes.w).arg(inRes.h));
+    parsed.replace("$outputResolution", QString("%1 x %2").arg(outRes.w).arg(outRes.h));
+    parsed.replace("$inputHz", QString::number(kc_hardware().status.signal().refreshRate));
+    parsed.replace("$outputFPS", QString::number(kd_output_framerate()));
+    parsed.replace("$areFramesDropped", (kc_are_frames_being_dropped()? "Dropping frames" : ""));
+    parsed.replace("$peakLatencyMs", QString::number(kd_peak_pipeline_latency()));
+    parsed.replace("$averageLatencyMs", QString::number(kd_average_pipeline_latency()));
+    parsed.replace("$systemTime", QDateTime::currentDateTime().time().toString());
+    parsed.replace("$systemDate", QDateTime::currentDateTime().date().toString());
 
-    return ("<font style=\"font-size: x-large; color: white; background-color: black;\">" + parsed + "</font>");
+    return ("<font style=\"font-size: large; color: white; background-color: black;\">" + parsed + "</font>");
 }
 
 // A convenience function to query the user for the name of an image file, and
@@ -180,6 +195,18 @@ void OverlayDialog::add_image_to_overlay(void)
     }
 
     insert_text_into_overlay_editor("<img src=\"" + filename + "\">");
+
+    return;
+}
+
+bool OverlayDialog::is_overlay_enabled(void)
+{
+    return ui->groupBox_overlayEnabled->isChecked();
+}
+
+void OverlayDialog::toggle_overlay(void)
+{
+    ui->groupBox_overlayEnabled->setChecked(!ui->groupBox_overlayEnabled->isChecked());
 
     return;
 }

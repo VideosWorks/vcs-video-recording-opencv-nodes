@@ -28,6 +28,9 @@ OGLWidget::OGLWidget(std::function<QImage()> overlay_as_qimage, QWidget *parent)
 {
     OVERLAY_AS_QIMAGE_F = overlay_as_qimage;
 
+    // Needed for auto-hiding the parent window's menu bar to work.
+    this->setMouseTracking(true);
+
     return;
 }
 
@@ -75,26 +78,24 @@ void OGLWidget::resizeGL(int w, int h)
 void OGLWidget::paintGL()
 {
     // Draw the output frame.
+    const resolution_s r = ks_output_resolution();
+    const u8 *const fb = ks_scaler_output_as_raw_ptr();
+    if (fb != nullptr)
     {
-        const resolution_s r = ks_output_resolution();
-        const u8 *const fb = ks_scaler_output_as_raw_ptr();
-        if (fb != nullptr)
-        {
-            this->glDisable(GL_BLEND);
+        this->glDisable(GL_BLEND);
 
-            this->glBindTexture(GL_TEXTURE_2D, FRAMEBUFFER_TEXTURE);
-            this->glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, r.w, r.h, 0, GL_BGRA, GL_UNSIGNED_BYTE, fb);
+        this->glBindTexture(GL_TEXTURE_2D, FRAMEBUFFER_TEXTURE);
+        this->glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, r.w, r.h, 0, GL_BGRA, GL_UNSIGNED_BYTE, fb);
 
-            glBegin(GL_TRIANGLES);
-                glTexCoord2i(0, 0); glVertex2i(0,             0);
-                glTexCoord2i(0, 1); glVertex2i(0,             this->height());
-                glTexCoord2i(1, 1); glVertex2i(this->width(), this->height());
+        glBegin(GL_TRIANGLES);
+            glTexCoord2i(0, 0); glVertex2i(0,             0);
+            glTexCoord2i(0, 1); glVertex2i(0,             this->height());
+            glTexCoord2i(1, 1); glVertex2i(this->width(), this->height());
 
-                glTexCoord2i(1, 1); glVertex2i(this->width(), this->height());
-                glTexCoord2i(1, 0); glVertex2i(this->width(), 0);
-                glTexCoord2i(0, 0); glVertex2i(0,             0);
-            glEnd();
-        }
+            glTexCoord2i(1, 1); glVertex2i(this->width(), this->height());
+            glTexCoord2i(1, 0); glVertex2i(this->width(), 0);
+            glTexCoord2i(0, 0); glVertex2i(0,             0);
+        glEnd();
     }
 
     // Draw the overlay, if any.
@@ -121,4 +122,3 @@ void OGLWidget::paintGL()
 
     return;
 }
-

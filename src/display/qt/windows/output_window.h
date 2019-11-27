@@ -8,12 +8,19 @@
 #define OUTPUT_WINDOW_H
 
 #include <QMainWindow>
+#include "display/qt/utility.h"
 #include "display/display.h"
 #include "common/globals.h"
 
+class OutputResolutionDialog;
+class InputResolutionDialog;
+class VideoAndColorDialog;
+class FilterGraphDialog;
+class AntiTearDialog;
 class OverlayDialog;
-class ControlPanel;
-class PerfDialog;
+class RecordDialog;
+class AliasDialog;
+class AboutDialog;
 
 struct capture_signal_s;
 struct mode_alias_s;
@@ -60,7 +67,7 @@ public:
 
     void clear_known_aliases(void);
 
-    void show_overlay_dialog(void);
+    void open_overlay_dialog(void);
 
     void measure_framerate(void);
 
@@ -76,8 +83,6 @@ public:
 
     void update_video_mode_params(void);
 
-    bool apply_programwide_styling(const QString &filename);
-
     uint output_framerate(void);
 
     void clear_filter_graph(void);
@@ -88,27 +93,64 @@ public:
 
     void set_filter_graph_options(const std::vector<filter_graph_option_s> &graphOptions);
 
+    void open_filter_graph_dialog(void);
+
+    void open_antitear_dialog(void);
+
+    void open_video_dialog(void);
+
+    void open_alias_dialog(void);
+
+    void open_about_dialog(void);
+
+    void open_record_dialog(void);
+
+    void open_output_resolution_dialog(void);
+
+    bool is_mouse_wheel_scaling_allowed(void);
+
+    void open_input_resolution_dialog(void);
+
+    void disable_output_size_controls(const bool areDisabled);
+
+    void set_recording_is_active(const bool isActive);
+
 private slots:
     void toggle_window_border(void);
 
 private:
+    void mouseDoubleClickEvent(QMouseEvent *event);
+    void mouseReleaseEvent(QMouseEvent *event);
+    void mousePressEvent(QMouseEvent *event);
+    void mouseMoveEvent(QMouseEvent *event);
+    void changeEvent(QEvent *event);
     void paintEvent(QPaintEvent *);
     void closeEvent(QCloseEvent *);
+    void enterEvent(QEvent *event);
+    void leaveEvent(QEvent *event);
     void wheelEvent(QWheelEvent *event);
-    void mouseMoveEvent(QMouseEvent *event);
-    void mousePressEvent(QMouseEvent *event);
-    void mouseReleaseEvent(QMouseEvent *event);
-    void mouseDoubleClickEvent(QMouseEvent *event);
-    void changeEvent(QEvent *event);
 
-    void set_keyboard_shortcuts();
+    void set_keyboard_shortcuts(void);
 
     bool load_font(const QString &filename);
 
     Ui::MainWindow *ui = nullptr;
 
-    ControlPanel *controlPanel = nullptr;
+    OutputResolutionDialog *outputResolutionDlg = nullptr;
+    InputResolutionDialog *inputResolutionDlg = nullptr;
+    VideoAndColorDialog *videoDlg = nullptr;
+    FilterGraphDialog *filterGraphDlg = nullptr;
+    AntiTearDialog *antitearDlg = nullptr;
     OverlayDialog *overlayDlg = nullptr;
+    RecordDialog *recordDlg = nullptr;
+    AliasDialog *aliasDlg = nullptr;
+    AboutDialog *aboutDlg = nullptr;
+
+    // A master list of all the dialogs that this window spawns. Will be filled in
+    // when we create the dialog instances.
+    QVector<QDialog*> dialogs;
+
+    mouse_activity_monitor_c mouseActivityMonitor;
 
     // Set to true when the user has selected to close the
     // main window.
